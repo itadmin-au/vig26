@@ -188,3 +188,48 @@ export async function sendTeamMemberInviteEmail({
     `,
   });
 }
+
+export async function sendPasswordResetEmail({
+  to,
+  name,
+  token,
+}: {
+  to: string;
+  name: string;
+  token: string;
+}) {
+  const resetLink = `${APP_URL}/auth/reset-password/${token}`;
+
+  await resend.emails.send({
+    from: FROM,
+    to,
+    subject: "Reset your Vigyanrang password",
+    html: `
+      <div style="background-color: #f9fafb; padding: 40px 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+        <div style="max-width: 560px; margin: 0 auto; background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 40px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+          <h2 style="color: #D97706; margin-top: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.025em;">Vigyanrang</h2>
+          <div style="height: 1px; background-color: #f3f4f6; margin: 24px 0;"></div>
+          <p style="font-size: 16px; line-height: 24px; color: #374151; margin-bottom: 16px;">Hi ${name},</p>
+          <p style="font-size: 16px; line-height: 24px; color: #374151; margin-bottom: 32px;">
+            We received a request to reset your password. Click the button below to choose a new one.
+            This link expires in <strong>1 hour</strong>.
+          </p>
+          <a href="${resetLink}" style="display: inline-block; background-color: #18181B; color: #ffffff; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px;">
+            Reset Password
+          </a>
+          <div style="margin-top: 40px; padding-top: 24px; border-top: 1px solid #f3f4f6;">
+            <p style="color: #9ca3af; font-size: 13px; line-height: 20px; margin: 0;">
+              If you didn't request a password reset, you can safely ignore this email — your password will not change.
+            </p>
+            <p style="color: #9ca3af; font-size: 12px; margin-top: 12px; word-break: break-all;">
+              Or copy this link: ${resetLink}
+            </p>
+          </div>
+        </div>
+        <p style="text-align: center; color: #9ca3af; font-size: 12px; margin-top: 24px;">
+          Sent by <a href="${APP_URL}" style="color: #9ca3af; text-decoration: underline;">Vigyanrang</a>
+        </p>
+      </div>
+    `,
+  });
+}

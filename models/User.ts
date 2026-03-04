@@ -1,3 +1,4 @@
+// models/User.ts
 import mongoose, { Schema, Document, Model } from "mongoose";
 import type { IUser } from "@/types";
 
@@ -50,16 +51,29 @@ const UserSchema = new Schema<IUserDocument>(
         ref: "Registration",
       },
     ],
+    // ── Password reset ────────────────────────────────────────────────────────
+    passwordResetToken: {
+      type: String,
+      default: null,
+      index: true,
+      sparse: true,
+    },
+    passwordResetExpires: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,
   }
 );
 
-// Prevent returning passwordHash in JSON responses by default
+// Prevent returning sensitive fields in JSON responses
 UserSchema.set("toJSON", {
   transform(_doc, ret) {
     delete ret.passwordHash;
+    delete ret.passwordResetToken;
+    delete ret.passwordResetExpires;
     return ret;
   },
 });

@@ -143,7 +143,15 @@ function LoginPageContent() {
 
                         <form onSubmit={handleSignIn} className="space-y-4">
                             <div className="space-y-1.5">
-                                <Label htmlFor="password">Password</Label>
+                                <div className="flex items-center justify-between">
+                                    <Label htmlFor="password">Password</Label>
+                                    <Link
+                                        href="/auth/forgot-password"
+                                        className="text-xs text-zinc-400 hover:text-orange-600 transition-colors"
+                                    >
+                                        Forgot password?
+                                    </Link>
+                                </div>
                                 <Input
                                     id="password"
                                     type="password"

@@ -1,3 +1,4 @@
+// lib/auth.ts
 import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
@@ -18,15 +19,13 @@ export const authOptions: NextAuthOptions = {
     },
 
     providers: [
-        // ─── Google OAuth (public/student accounts only) ────────────────────────
+        // ─── Google OAuth (public/student accounts only) ─────────────────────
         GoogleProvider({
             clientId: process.env.GOOGLE_CLIENT_ID ?? "",
             clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
-            // Only enabled when credentials are present
-            allowDangerousEmailAccountLinking: true,
         }),
 
-        // ─── Credentials (all roles — management uses this exclusively) ─────────
+        // ─── Credentials (all roles) ─────────────────────────────────────────
         CredentialsProvider({
             name: "credentials",
             credentials: {
@@ -49,11 +48,15 @@ export const authOptions: NextAuthOptions = {
                 }
 
                 if (!user.passwordHash) {
-                    // Account exists but was created via Google OAuth
-                    throw new Error("This account uses Google Sign-In. Please continue with Google.");
+                    throw new Error(
+                        "This account uses Google Sign-In. Please continue with Google."
+                    );
                 }
 
-                const isValid = await verifyPassword(credentials.password, user.passwordHash);
+                const isValid = await verifyPassword(
+                    credentials.password,
+                    user.passwordHash
+                );
                 if (!isValid) {
                     throw new Error("Incorrect password");
                 }
@@ -63,7 +66,9 @@ export const authOptions: NextAuthOptions = {
                     name: user.name,
                     email: user.email,
                     role: user.role as UserRole,
-                    departments: (user.departments ?? []).map((d: any) => d.toString()),
+                    departments: (user.departments ?? []).map((d: any) =>
+                        d.toString()
+                    ),
                     image: null,
                 };
             },
@@ -71,7 +76,7 @@ export const authOptions: NextAuthOptions = {
     ],
 
     callbacks: {
-        // ─── signIn: block management roles from using Google OAuth ─────────────
+        // ─── signIn ──────────────────────────────────────────────────────────
         async signIn({ user, account }) {
             if (account?.provider === "google") {
                 await connectDB();
@@ -79,15 +84,24 @@ export const authOptions: NextAuthOptions = {
                 const existingUser = await User.findOne({ email: user.email });
 
                 if (existingUser) {
-                    const managementRoles: UserRole[] = ["coordinator", "dept_admin", "super_admin"];
+                    // Block management accounts from using Google OAuth
+                    const managementRoles: UserRole[] = [
+                        "coordinator",
+                        "dept_admin",
+                        "super_admin",
+                    ];
                     if (managementRoles.includes(existingUser.role)) {
-                        // Management accounts cannot use Google OAuth
                         return "/manage/login?error=OAuthNotAllowed";
                     }
-                    // Existing student — link googleId if not already set
+
+                    // ── Merge: link googleId to existing email/password account ──
+                    // This handles the case where a student first signed up with
+                    // email+password and then tries "Continue with Google" using
+                    // the same email. We link the Google identity without forcing
+                    // them to create a second account.
                     if (!existingUser.googleId) {
                         await User.findByIdAndUpdate(existingUser._id, {
-                            googleId: user.id,
+                            googleId: account.providerAccountId,
                         });
                     }
                 } else {
@@ -95,7 +109,7 @@ export const authOptions: NextAuthOptions = {
                     await User.create({
                         name: user.name ?? undefined,
                         email: user.email ?? undefined,
-                        googleId: user.id,
+                        googleId: account.providerAccountId,
                         role: "student",
                         departments: [],
                         registeredEvents: [],
@@ -105,23 +119,30 @@ export const authOptions: NextAuthOptions = {
             return true;
         },
 
-        // ─── JWT: embed custom fields into the token ─────────────────────────────
+        // ─── JWT ─────────────────────────────────────────────────────────────
         async jwt({ token, user, account, trigger, session }) {
-            // On first sign-in, `user` is populated
-            if (user) {
+            // On first sign-in with credentials, `user` object is fully populated
+            if (user && account?.provider === "credentials") {
                 token.id = user.id;
                 token.role = (user as any).role;
                 token.departments = (user as any).departments ?? [];
             }
 
-            // For Google sign-ins, fetch role and departments from DB
+            // On every Google sign-in (first AND subsequent), always fetch fresh
+            // data from the DB so that role/department changes are reflected and
+            // the googleId→userId mapping is resolved correctly.
             if (account?.provider === "google" && token.email) {
                 await connectDB();
-                const dbUser = await User.findOne({ email: token.email }).lean();
+                const dbUser = await User.findOne({
+                    email: token.email,
+                }).lean();
+
                 if (dbUser) {
                     token.id = (dbUser._id as any).toString();
                     token.role = dbUser.role;
-                    token.departments = (dbUser.departments ?? []).map((d: any) => d.toString());
+                    token.departments = (dbUser.departments ?? []).map((d: any) =>
+                        d.toString()
+                    );
                 }
             }
 
@@ -133,7 +154,7 @@ export const authOptions: NextAuthOptions = {
             return token;
         },
 
-        // ─── Session: expose token fields to the client ──────────────────────────
+        // ─── Session ─────────────────────────────────────────────────────────
         async session({ session, token }) {
             if (session.user) {
                 session.user.id = token.id as string;

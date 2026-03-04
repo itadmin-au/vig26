@@ -70,20 +70,20 @@ export interface IUser {
     _id: Types.ObjectId | string;
     name: string;
     email: string;
-    /** Null for Google OAuth users */
     passwordHash?: string;
-    /** Null for email/password users */
     googleId?: string;
     role: UserRole;
-    /** Optional — free text, no format enforced */
     collegeId?: string;
-    /** Department ObjectIds this user belongs to */
     departments: (Types.ObjectId | string)[];
-    /** Registration ObjectIds */
     registeredEvents: (Types.ObjectId | string)[];
+    passwordResetToken?: string | null;
+    passwordResetExpires?: Date | null;
     createdAt: Date;
     updatedAt: Date;
 }
+
+
+
 
 // ─── Department ──────────────────────────────────────────────────────────────
 
