@@ -4,6 +4,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { getManageEvents } from "@/actions/events";
 import { getEventRegistrations, toggleAttendance } from "@/actions/registrations";
 import { toast } from "sonner";
@@ -12,6 +13,9 @@ import {
     IconCalendarEvent, IconMapPin, IconUsers, IconCurrencyRupee,
 } from "@tabler/icons-react";
 import type { IEvent, IRegistration } from "@/types";
+import "@uiw/react-markdown-preview/markdown.css";
+
+const MDPreview = dynamic(() => import("@uiw/react-markdown-preview"), { ssr: false });
 
 export default function ManageEventDetailPage() {
     const { id } = useParams<{ id: string }>();
@@ -103,12 +107,12 @@ export default function ManageEventDetailPage() {
     const pending = registrations.filter((r: any) => r.status === "pending").length;
 
     return (
-        <div className="space-y-5 max-w-4xl">
+        <div className="space-y-5 max-w-4xl mx-auto">
             {/* Breadcrumb */}
             <div className="flex items-center justify-between">
                 <button
                     onClick={() => router.back()}
-                    className="flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-800 transition-colors"
+                    className="flex items-center gap-1.5 text-sm border rounded-md px-3 py-1.5 text-zinc-500 hover:text-zinc-800 transition-colors"
                 >
                     <IconArrowLeft size={16} />
                     Back
@@ -207,19 +211,17 @@ export default function ManageEventDetailPage() {
                     {event.description && (
                         <div className="bg-white rounded-xl border border-zinc-200 p-5">
                             <h3 className="text-sm font-semibold text-zinc-900 mb-2">Description</h3>
-                            <div
-                                className="text-sm text-zinc-600 leading-relaxed prose prose-sm max-w-none"
-                                dangerouslySetInnerHTML={{ __html: event.description }}
-                            />
+                            <div className="prose prose-sm max-w-none" data-color-mode="light">
+                                <MDPreview source={event.description} />
+                            </div>
                         </div>
                     )}
                     {event.rules && (
                         <div className="bg-white rounded-xl border border-zinc-200 p-5">
                             <h3 className="text-sm font-semibold text-zinc-900 mb-2">Rules</h3>
-                            <div
-                                className="text-sm text-zinc-600 leading-relaxed prose prose-sm max-w-none"
-                                dangerouslySetInnerHTML={{ __html: event.rules }}
-                            />
+                            <div className="prose prose-sm max-w-none" data-color-mode="light">
+                                <MDPreview source={event.rules} />
+                            </div>
                         </div>
                     )}
                     {event.isTeamEvent && event.teamSize && (

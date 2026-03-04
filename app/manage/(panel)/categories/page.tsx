@@ -56,7 +56,7 @@ export default function ManageCategoriesPage() {
     const custom = categories.filter((c) => !c.isDefault);
 
     return (
-        <div className="space-y-5 max-w-2xl">
+        <div className="space-y-5 max-w-2xl mx-auto">
             <div>
                 <h1 className="text-2xl font-bold text-zinc-900">Categories</h1>
                 <p className="text-sm text-zinc-500 mt-0.5">Manage event categories. Default categories cannot be deleted.</p>

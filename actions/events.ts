@@ -99,6 +99,8 @@ export async function createEvent(formData: FormData) {
     const parsed = createEventSchema.safeParse({
         ...raw,
         coverImage,
+        dateStart: raw.dateStart ? new Date(raw.dateStart as string).toISOString() : undefined,
+        dateEnd: raw.dateEnd ? new Date(raw.dateEnd as string).toISOString() : undefined,
         capacity: Number(raw.capacity ?? 0),
         price: Number(raw.price ?? 0),
         isTeamEvent: raw.isTeamEvent === "true",
@@ -149,6 +151,8 @@ export async function updateEvent(id: string, formData: FormData) {
     const parsed = updateEventSchema.safeParse({
         ...raw,
         coverImage,
+        dateStart: raw.dateStart ? new Date(raw.dateStart as string).toISOString() : undefined,
+        dateEnd: raw.dateEnd ? new Date(raw.dateEnd as string).toISOString() : undefined,
         capacity: raw.capacity !== undefined ? Number(raw.capacity) : undefined,
         price: raw.price !== undefined ? Number(raw.price) : undefined,
         isTeamEvent: raw.isTeamEvent !== undefined ? raw.isTeamEvent === "true" : undefined,

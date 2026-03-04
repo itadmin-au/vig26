@@ -70,7 +70,7 @@ export default function ManageEventsPage() {
                 </div>
                 <Link
                     href="/manage/events/new"
-                    className="flex items-center gap-2 px-4 py-2 bg-zinc-900 hover:bg-zinc-700 text-white text-sm font-medium rounded-lg transition-colors"
+                    className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/80 text-white text-sm font-medium rounded-lg transition-colors"
                 >
                     <IconPlus size={16} />
                     New Event
@@ -78,7 +78,7 @@ export default function ManageEventsPage() {
             </div>
 
             {/* Search + Tabs */}
-            <div className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
+            <div className="bg-white rounded-xl border border-zinc-200">
                 <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-100">
                     <div className="relative flex-1 max-w-sm">
                         <IconSearch size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
