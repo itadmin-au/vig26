@@ -52,11 +52,17 @@ function Steps({ current, steps }: { current: number; steps: string[] }) {
 
 function TeamStep({
     event,
+    leaderName,
+    setLeaderName,
+    leaderEmail,
     members,
     setMembers,
     onNext,
 }: {
     event: IEvent;
+    leaderName: string;
+    setLeaderName: (v: string) => void;
+    leaderEmail: string;
     members: { name: string; email: string }[];
     setMembers: (m: { name: string; email: string }[]) => void;
     onNext: () => void;
@@ -120,10 +126,39 @@ function TeamStep({
             </div>
 
             <div className="space-y-3">
+                {/* Leader — Teammate 1 */}
+                <div className="bg-zinc-50 border border-zinc-200 rounded-xl p-4">
+                    <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium text-zinc-700">Teammate 1</span>
+                        <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">You · Leader</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <Label className="text-xs mb-1">Name</Label>
+                            <Input
+                                value={leaderName}
+                                onChange={(e) => setLeaderName(e.target.value)}
+                                placeholder="Your name"
+                                className="h-9 bg-white"
+                            />
+                        </div>
+                        <div>
+                            <Label className="text-xs mb-1">Email</Label>
+                            <Input
+                                type="email"
+                                value={leaderEmail}
+                                disabled
+                                className="h-9 bg-zinc-100 text-zinc-400 cursor-not-allowed"
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                {/* Additional teammates — start from Teammate 2 */}
                 {members.map((m, i) => (
                     <div key={i} className="bg-zinc-50 border border-zinc-200 rounded-xl p-4">
                         <div className="flex items-center justify-between mb-3">
-                            <span className="text-sm font-medium text-zinc-700">Teammate {i + 1}</span>
+                            <span className="text-sm font-medium text-zinc-700">Teammate {i + 2}</span>
                             {members.length > minTeammates && (
                                 <button
                                     type="button"
@@ -166,7 +201,7 @@ function TeamStep({
                     className="flex items-center gap-2 w-full justify-center py-2.5 border-2 border-dashed border-zinc-200 rounded-xl text-sm text-zinc-500 hover:border-primary/40 hover:text-primary transition-colors"
                 >
                     <IconPlus size={15} />
-                    Add teammate ({members.length + 1} of {maxTeammates} max)
+                    Add teammate ({members.length + 2} of {maxTeammates + 1} max)
                 </button>
             )}
 
@@ -279,6 +314,8 @@ function FormStep({
 
 function ReviewStep({
     event,
+    leaderName,
+    leaderEmail,
     members,
     responses,
     onBack,
@@ -286,6 +323,8 @@ function ReviewStep({
     submitting,
 }: {
     event: IEvent;
+    leaderName: string;
+    leaderEmail: string;
     members: { name: string; email: string }[];
     responses: Record<string, string>;
     onBack: () => void;
@@ -322,8 +361,11 @@ function ReviewStep({
                     </h3>
                     <div className="space-y-2">
                         <div className="flex items-center justify-between text-sm">
-                            <span className="font-medium text-zinc-800">You</span>
-                            <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">Leader</span>
+                            <span className="font-medium text-zinc-800">{leaderName || "You"}</span>
+                            <div className="flex items-center gap-2">
+                                <span className="text-zinc-400 text-xs truncate max-w-40">{leaderEmail}</span>
+                                <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">Leader</span>
+                            </div>
                         </div>
                         {members.map((m, i) => (
                             <div key={i} className="flex items-center justify-between text-sm">
@@ -436,6 +478,7 @@ export default function RegisterPage() {
 
     const [members, setMembers] = useState<{ name: string; email: string }[]>([]);
     const [responses, setResponses] = useState<Record<string, string>>({});
+    const [leaderName, setLeaderName] = useState("");
 
     useEffect(() => {
         if (status === "unauthenticated") {
@@ -450,6 +493,9 @@ export default function RegisterPage() {
                 return;
             }
             setEvent(data);
+
+            // Pre-fill leader name from session
+            setLeaderName(session?.user?.name ?? "");
 
             // Seed exactly (totalMin - 1) teammate rows — excluding the leader
             if (data.isTeamEvent && data.teamSize) {
@@ -535,6 +581,9 @@ export default function RegisterPage() {
                                     return (
                                         <TeamStep
                                             event={event}
+                                            leaderName={leaderName}
+                                            setLeaderName={setLeaderName}
+                                            leaderEmail={session?.user?.email ?? ""}
                                             members={members}
                                             setMembers={setMembers}
                                             onNext={() => setStep(s => s + 1)}
@@ -559,6 +608,8 @@ export default function RegisterPage() {
                                 return (
                                     <ReviewStep
                                         event={event}
+                                        leaderName={leaderName}
+                                        leaderEmail={session?.user?.email ?? ""}
                                         members={members}
                                         responses={responses}
                                         onBack={() => setStep(s => s - 1)}
