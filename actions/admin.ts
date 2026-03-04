@@ -56,7 +56,7 @@ export async function getDepartment(id: string) {
 }
 
 export async function createDepartment(input: unknown) {
-    await requireSuperAdmin();
+    const session = await requireSuperAdmin();
     await connectDB();
 
     const parsed = createDepartmentSchema.safeParse(input);
@@ -67,7 +67,10 @@ export async function createDepartment(input: unknown) {
     const existing = await Department.findOne({ name: parsed.data.name });
     if (existing) return { success: false, error: "A department with this name already exists." };
 
-    const department = await Department.create(parsed.data);
+    const department = await Department.create({
+        ...parsed.data,
+        createdBy: session.user.id,
+    });
     return { success: true, data: serialize(department) };
 }
 
@@ -175,6 +178,66 @@ export async function sendInvite(input: unknown) {
     });
 
     return { success: true, message: `Invite sent to ${email}.` };
+}
+
+export async function upgradeExistingUser(input: {
+    userId: string;
+    departmentId: string;
+    role: "coordinator" | "dept_admin";
+}) {
+    const session = await requireManagement();
+
+    if (!isDeptAdmin(session.user.role)) {
+        return { success: false, error: "Only admins can add members." };
+    }
+
+    if (
+        session.user.role !== "super_admin" &&
+        !session.user.departments.includes(input.departmentId)
+    ) {
+        return { success: false, error: "You do not have access to this department." };
+    }
+
+    await connectDB();
+
+    const department = await Department.findById(input.departmentId);
+    if (!department) return { success: false, error: "Department not found." };
+
+    const user = await User.findById(input.userId);
+    if (!user) return { success: false, error: "User not found." };
+
+    const alreadyMember = department.members?.some(
+        (m: any) => m.userId?.toString() === input.userId
+    );
+
+    if (alreadyMember) {
+        await Department.findByIdAndUpdate(input.departmentId, {
+            $set: { "members.$[m].role": input.role },
+        }, {
+            arrayFilters: [{ "m.userId": user._id }],
+        });
+    } else {
+        await Department.findByIdAndUpdate(input.departmentId, {
+            $addToSet: { members: { userId: user._id, role: input.role } },
+        });
+    }
+
+    const shouldUpgradeRole =
+        input.role === "dept_admin" ||
+        (input.role === "coordinator" && user.role === "student");
+
+    if (shouldUpgradeRole) {
+        await User.findByIdAndUpdate(user._id, {
+            role: input.role,
+            $addToSet: { departments: input.departmentId },
+        });
+    } else {
+        await User.findByIdAndUpdate(user._id, {
+            $addToSet: { departments: input.departmentId },
+        });
+    }
+
+    return { success: true, message: `${user.name} added to ${department.name}.` };
 }
 
 export async function cancelInvite(inviteId: string) {

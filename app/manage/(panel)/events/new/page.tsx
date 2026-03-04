@@ -1,10 +1,12 @@
 // app/manage/(panel)/events/new/page.tsx
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { createEvent } from "@/actions/events";
-import { getCategories } from "@/actions/events";
+import { useSession } from "next-auth/react";
+import dynamic from "next/dynamic";
+import { createEvent, getCategories } from "@/actions/events";
+import { getDepartments } from "@/actions/admin";
 import { toast } from "sonner";
 import {
     IconPlus, IconTrash, IconGripVertical, IconUpload,
@@ -13,8 +15,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useEffect } from "react";
 import type { IFormField, FormFieldType } from "@/types";
+import "@uiw/react-md-editor/markdown-editor.css";
+import "@uiw/react-markdown-preview/markdown.css";
+
+const MDEditor = dynamic(() => import("@uiw/react-md-editor"), { ssr: false });
 
 const FIELD_TYPES: { value: FormFieldType; label: string }[] = [
     { value: "short_text", label: "Short Text" },
@@ -93,6 +98,7 @@ function FormFieldRow({
                     </div>
                 </div>
                 <button
+                    type="button"
                     onClick={() => onRemove(index)}
                     className="mt-1 p-1.5 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                 >
@@ -108,8 +114,9 @@ function FormFieldRow({
                             <span key={i} className="flex items-center gap-1 px-2 py-0.5 bg-white border border-zinc-200 rounded-full text-xs">
                                 {opt}
                                 <button
+                                    type="button"
                                     onClick={() => onUpdate(index, {
-                                        options: field.options?.filter((_, oi) => oi !== i)
+                                        options: field.options?.filter((_, oi) => oi !== i),
                                     })}
                                     className="text-zinc-400 hover:text-red-500 ml-0.5"
                                 >
@@ -126,7 +133,7 @@ function FormFieldRow({
                                 if (e.key === "Enter" && optionInput.trim()) {
                                     e.preventDefault();
                                     onUpdate(index, {
-                                        options: [...(field.options ?? []), optionInput.trim()]
+                                        options: [...(field.options ?? []), optionInput.trim()],
                                     });
                                     setOptionInput("");
                                 }
@@ -142,7 +149,7 @@ function FormFieldRow({
                             onClick={() => {
                                 if (optionInput.trim()) {
                                     onUpdate(index, {
-                                        options: [...(field.options ?? []), optionInput.trim()]
+                                        options: [...(field.options ?? []), optionInput.trim()],
                                     });
                                     setOptionInput("");
                                 }
@@ -159,20 +166,38 @@ function FormFieldRow({
 
 export default function NewEventPage() {
     const router = useRouter();
+    const { data: session } = useSession();
+    const isSuperAdmin = session?.user?.role === "super_admin";
+
     const [loading, setLoading] = useState(false);
     const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
+    const [departments, setDepartments] = useState<{ _id: string; name: string }[]>([]);
+    const [selectedDeptId, setSelectedDeptId] = useState("");
     const [coverPreview, setCoverPreview] = useState<string | null>(null);
+    const [description, setDescription] = useState("");
+    const [rules, setRules] = useState("");
     const [formFields, setFormFields] = useState<IFormField[]>([]);
     const [isTeamEvent, setIsTeamEvent] = useState(false);
+    const [teamSizeMin, setTeamSizeMin] = useState(2);
+    const [teamSizeMax, setTeamSizeMax] = useState(5);
     const [expandedSections, setExpandedSections] = useState({
-        basic: true, details: true, rules: true, team: false, form: false, status: true,
+        basic: true, details: true, rules: false, team: false, form: false,
     });
 
     useEffect(() => {
         getCategories().then((cats: any[]) => {
-            setCategories(cats.map((c) => c.slug));
+            if (cats.length) setCategories(cats.map((c) => c.slug));
         }).catch(() => { });
-    }, []);
+
+        if (isSuperAdmin) {
+            getDepartments().then((depts: any[]) => {
+                setDepartments(depts);
+                if (depts.length) setSelectedDeptId(depts[0]._id);
+            }).catch(() => { });
+        } else if (session?.user?.departments?.length) {
+            setSelectedDeptId(session.user.departments[0]);
+        }
+    }, [isSuperAdmin, session]);
 
     function toggleSection(key: keyof typeof expandedSections) {
         setExpandedSections((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -193,7 +218,7 @@ export default function NewEventPage() {
     }, []);
 
     const updateField = useCallback((index: number, updates: Partial<IFormField>) => {
-        setFormFields((prev) => prev.map((f, i) => i === index ? { ...f, ...updates } : f));
+        setFormFields((prev) => prev.map((f, i) => (i === index ? { ...f, ...updates } : f)));
     }, []);
 
     const removeField = useCallback((index: number) => {
@@ -202,12 +227,26 @@ export default function NewEventPage() {
 
     async function handleSubmit(e: React.FormEvent<HTMLFormElement>, status: "draft" | "published") {
         e.preventDefault();
+
+        if (!selectedDeptId) {
+            toast.error("Please select a department.");
+            return;
+        }
+
         setLoading(true);
 
         const formData = new FormData(e.currentTarget);
         formData.set("status", status);
         formData.set("isTeamEvent", String(isTeamEvent));
+        formData.set("description", description);
+        formData.set("rules", rules);
+        formData.set("departmentId", selectedDeptId);
         formData.set("customForm", JSON.stringify(formFields.map((f, i) => ({ ...f, order: i }))));
+
+        if (isTeamEvent) {
+            formData.set("teamSizeMin", String(teamSizeMin));
+            formData.set("teamSizeMax", String(teamSizeMax));
+        }
 
         const result = await createEvent(formData);
         setLoading(false);
@@ -220,7 +259,11 @@ export default function NewEventPage() {
         }
     }
 
-    function SectionHeader({ title, description, sectionKey }: {
+    function SectionHeader({
+        title,
+        description: desc,
+        sectionKey,
+    }: {
         title: string;
         description?: string;
         sectionKey: keyof typeof expandedSections;
@@ -233,9 +276,13 @@ export default function NewEventPage() {
             >
                 <div>
                     <p className="text-sm font-semibold text-zinc-900">{title}</p>
-                    {description && <p className="text-xs text-zinc-400 mt-0.5">{description}</p>}
+                    {desc && <p className="text-xs text-zinc-400 mt-0.5">{desc}</p>}
                 </div>
-                {expandedSections[sectionKey] ? <IconChevronUp size={16} className="text-zinc-400" /> : <IconChevronDown size={16} className="text-zinc-400" />}
+                {expandedSections[sectionKey] ? (
+                    <IconChevronUp size={16} className="text-zinc-400" />
+                ) : (
+                    <IconChevronDown size={16} className="text-zinc-400" />
+                )}
             </button>
         );
     }
@@ -249,25 +296,60 @@ export default function NewEventPage() {
 
             <form onSubmit={(e) => handleSubmit(e, "draft")} className="space-y-4">
 
-                {/* Section 1: Basic Info */}
+                {isSuperAdmin && (
+                    <div className="bg-white rounded-xl border border-zinc-200 px-5 py-4">
+                        <Label htmlFor="deptSelect">
+                            Department <span className="text-red-500">*</span>
+                        </Label>
+                        <select
+                            id="deptSelect"
+                            value={selectedDeptId}
+                            onChange={(e) => setSelectedDeptId(e.target.value)}
+                            required
+                            className="mt-1 w-full h-9 text-sm border border-zinc-200 rounded-lg px-3 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+                        >
+                            <option value="" disabled>Select a department…</option>
+                            {departments.map((d) => (
+                                <option key={d._id} value={d._id}>{d.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                )}
+
                 <div className="bg-white rounded-xl border border-zinc-200 px-5">
-                    <SectionHeader title="Basic Info" description="Title, description, and cover image" sectionKey="basic" />
+                    <SectionHeader
+                        title="Basic Info"
+                        description="Title, description, and cover image"
+                        sectionKey="basic"
+                    />
                     {expandedSections.basic && (
                         <div className="pb-5 space-y-4">
                             <div>
-                                <Label htmlFor="title">Event Title <span className="text-red-500">*</span></Label>
-                                <Input id="title" name="title" placeholder="e.g. National Hackathon 2026" required className="mt-1" />
-                            </div>
-                            <div>
-                                <Label htmlFor="description">Description</Label>
-                                <textarea
-                                    id="description"
-                                    name="description"
-                                    rows={4}
-                                    placeholder="Describe what this event is about…"
-                                    className="mt-1 w-full text-sm border border-zinc-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-400 resize-none"
+                                <Label htmlFor="title">
+                                    Event Title <span className="text-red-500">*</span>
+                                </Label>
+                                <Input
+                                    id="title"
+                                    name="title"
+                                    placeholder="e.g. National Hackathon 2026"
+                                    required
+                                    className="mt-1"
                                 />
                             </div>
+
+                            <div>
+                                <Label>Description</Label>
+                                <p className="text-xs text-zinc-400 mt-0.5 mb-1.5">Supports Markdown formatting.</p>
+                                <div data-color-mode="light">
+                                    <MDEditor
+                                        value={description}
+                                        onChange={(val) => setDescription(val ?? "")}
+                                        height={220}
+                                        preview="edit"
+                                    />
+                                </div>
+                            </div>
+
                             <div>
                                 <Label>Cover Image</Label>
                                 <div className="mt-1">
@@ -304,14 +386,19 @@ export default function NewEventPage() {
                     )}
                 </div>
 
-                {/* Section 2: Details */}
                 <div className="bg-white rounded-xl border border-zinc-200 px-5">
-                    <SectionHeader title="Event Details" description="Type, category, date, venue, capacity, and pricing" sectionKey="details" />
+                    <SectionHeader
+                        title="Event Details"
+                        description="Type, category, date, venue, capacity, and pricing"
+                        sectionKey="details"
+                    />
                     {expandedSections.details && (
                         <div className="pb-5 space-y-4">
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <Label htmlFor="type">Type <span className="text-red-500">*</span></Label>
+                                    <Label htmlFor="type">
+                                        Type <span className="text-red-500">*</span>
+                                    </Label>
                                     <select
                                         id="type"
                                         name="type"
@@ -324,12 +411,14 @@ export default function NewEventPage() {
                                     </select>
                                 </div>
                                 <div>
-                                    <Label htmlFor="category">Category <span className="text-red-500">*</span></Label>
+                                    <Label htmlFor="category">
+                                        Category <span className="text-red-500">*</span>
+                                    </Label>
                                     <select
                                         id="category"
                                         name="category"
                                         required
-                                        className="mt-1 w-full h-9 text-sm border capitalize border-zinc-200 rounded-lg px-3 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+                                        className="mt-1 w-full h-9 text-sm capitalize border border-zinc-200 rounded-lg px-3 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/20"
                                     >
                                         {categories.map((c) => (
                                             <option key={c} value={c} className="capitalize">{c}</option>
@@ -337,55 +426,80 @@ export default function NewEventPage() {
                                     </select>
                                 </div>
                             </div>
+
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <Label htmlFor="dateStart">Start Date & Time <span className="text-red-500">*</span></Label>
+                                    <Label htmlFor="dateStart">
+                                        Start Date & Time <span className="text-red-500">*</span>
+                                    </Label>
                                     <Input id="dateStart" name="dateStart" type="datetime-local" required className="mt-1" />
                                 </div>
                                 <div>
-                                    <Label htmlFor="dateEnd">End Date & Time <span className="text-red-500">*</span></Label>
+                                    <Label htmlFor="dateEnd">
+                                        End Date & Time <span className="text-red-500">*</span>
+                                    </Label>
                                     <Input id="dateEnd" name="dateEnd" type="datetime-local" required className="mt-1" />
                                 </div>
                             </div>
+
                             <div>
                                 <Label htmlFor="venue">Venue</Label>
                                 <Input id="venue" name="venue" placeholder="e.g. Main Auditorium or Zoom link" className="mt-1" />
                             </div>
+
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <Label htmlFor="capacity">Capacity</Label>
-                                    <Input id="capacity" name="capacity" type="number" min="0" defaultValue="0" placeholder="0 = unlimited" className="mt-1" />
+                                    <Label htmlFor="capacity">
+                                        Capacity{isTeamEvent ? " (teams)" : ""}
+                                    </Label>
+                                    <Input
+                                        id="capacity"
+                                        name="capacity"
+                                        type="number"
+                                        min="0"
+                                        defaultValue="0"
+                                        className="mt-1"
+                                    />
+                                    <p className="text-xs text-zinc-400 mt-1">
+                                        {isTeamEvent ? "Max teams. 0 = unlimited." : "0 = unlimited."}
+                                    </p>
                                 </div>
                                 <div>
                                     <Label htmlFor="price">Price (₹)</Label>
-                                    <Input id="price" name="price" type="number" min="0" defaultValue="0" placeholder="0 = free" className="mt-1" />
+                                    <Input id="price" name="price" type="number" min="0" defaultValue="0" className="mt-1" />
+                                    <p className="text-xs text-zinc-400 mt-1">0 = free event.</p>
                                 </div>
                             </div>
-
-                            {/* Department — hidden, will be set by session in action */}
-                            <input type="hidden" name="departmentId" />
                         </div>
                     )}
                 </div>
 
-                {/* Section 3: Rules */}
                 <div className="bg-white rounded-xl border border-zinc-200 px-5">
-                    <SectionHeader title="Rules" description="Event rules and guidelines for participants" sectionKey="rules" />
+                    <SectionHeader
+                        title="Rules"
+                        description="Event rules and guidelines — supports Markdown"
+                        sectionKey="rules"
+                    />
                     {expandedSections.rules && (
                         <div className="pb-5">
-                            <textarea
-                                name="rules"
-                                rows={5}
-                                placeholder="Enter event rules, guidelines, eligibility criteria…"
-                                className="w-full text-sm border border-zinc-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-400 resize-none"
-                            />
+                            <div data-color-mode="light">
+                                <MDEditor
+                                    value={rules}
+                                    onChange={(val) => setRules(val ?? "")}
+                                    height={200}
+                                    preview="edit"
+                                />
+                            </div>
                         </div>
                     )}
                 </div>
 
-                {/* Section 4: Team Settings */}
                 <div className="bg-white rounded-xl border border-zinc-200 px-5">
-                    <SectionHeader title="Team Settings" description="Configure team participation" sectionKey="team" />
+                    <SectionHeader
+                        title="Team Settings"
+                        description="Configure team participation"
+                        sectionKey="team"
+                    />
                     {expandedSections.team && (
                         <div className="pb-5 space-y-4">
                             <label className="flex items-center gap-3 cursor-pointer">
@@ -400,15 +514,52 @@ export default function NewEventPage() {
                                     <p className="text-xs text-zinc-400">Enable team registration for this event</p>
                                 </div>
                             </label>
+
                             {isTeamEvent && (
-                                <div className="grid grid-cols-2 gap-4 pl-7">
-                                    <div>
-                                        <Label htmlFor="teamSizeMin">Min Team Size</Label>
-                                        <Input id="teamSizeMin" name="teamSizeMin" type="number" min="2" defaultValue="2" className="mt-1" />
+                                <div className="pl-7 space-y-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <Label htmlFor="teamSizeMinInput">Min Team Size</Label>
+                                            <Input
+                                                id="teamSizeMinInput"
+                                                type="number"
+                                                min="2"
+                                                max={teamSizeMax}
+                                                value={teamSizeMin}
+                                                onChange={(e) => {
+                                                    const v = Math.max(2, Number(e.target.value));
+                                                    setTeamSizeMin(v);
+                                                    if (v > teamSizeMax) setTeamSizeMax(v);
+                                                }}
+                                                className="mt-1"
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label htmlFor="teamSizeMaxInput">Max Team Size</Label>
+                                            <Input
+                                                id="teamSizeMaxInput"
+                                                type="number"
+                                                min={teamSizeMin}
+                                                value={teamSizeMax}
+                                                onChange={(e) => {
+                                                    const v = Math.max(teamSizeMin, Number(e.target.value));
+                                                    setTeamSizeMax(v);
+                                                }}
+                                                className="mt-1"
+                                            />
+                                        </div>
                                     </div>
-                                    <div>
-                                        <Label htmlFor="teamSizeMax">Max Team Size</Label>
-                                        <Input id="teamSizeMax" name="teamSizeMax" type="number" min="2" defaultValue="5" className="mt-1" />
+
+                                    <div className="bg-orange-50 border border-orange-100 rounded-lg px-4 py-3">
+                                        <p className="text-xs font-medium text-orange-700 mb-1">How team registration works</p>
+                                        <p className="text-xs text-orange-600">
+                                            The team leader registers and enters{" "}
+                                            {teamSizeMin - 1 === teamSizeMax - 1
+                                                ? `exactly ${teamSizeMin - 1}`
+                                                : `${teamSizeMin - 1}–${teamSizeMax - 1}`}{" "}
+                                            teammate{teamSizeMax - 1 !== 1 ? "s" : ""} (name + email).
+                                            Capacity counts teams, not individuals.
+                                        </p>
                                     </div>
                                 </div>
                             )}
@@ -416,9 +567,12 @@ export default function NewEventPage() {
                     )}
                 </div>
 
-                {/* Section 5: Dynamic Form Builder */}
                 <div className="bg-white rounded-xl border border-zinc-200 px-5">
-                    <SectionHeader title="Registration Form" description="Add custom fields for participants to fill out" sectionKey="form" />
+                    <SectionHeader
+                        title="Registration Form"
+                        description="Add custom fields for participants to fill out"
+                        sectionKey="form"
+                    />
                     {expandedSections.form && (
                         <div className="pb-5 space-y-3">
                             {formFields.length === 0 ? (
@@ -448,7 +602,6 @@ export default function NewEventPage() {
                     )}
                 </div>
 
-                {/* Submit */}
                 <div className="bg-white rounded-xl border border-zinc-200 px-5 py-4 flex items-center justify-between gap-4">
                     <button
                         type="button"
@@ -458,23 +611,20 @@ export default function NewEventPage() {
                         Cancel
                     </button>
                     <div className="flex items-center gap-3">
-                        <Button
-                            type="submit"
-                            variant="outline"
-                            disabled={loading}
-                            className="text-sm"
-                        >
+                        <Button type="submit" variant="outline" disabled={loading} className="text-sm">
                             {loading ? "Saving…" : "Save as Draft"}
                         </Button>
                         <Button
                             type="button"
                             disabled={loading}
-                            className="bg-primary hover:bg-primary/80 text-white text-sm"
+                            className="bg-zinc-900 hover:bg-zinc-700 text-white text-sm"
                             onClick={(e) => {
                                 const form = (e.target as HTMLElement).closest("form") as HTMLFormElement;
                                 if (form) {
-                                    e.preventDefault();
-                                    handleSubmit({ currentTarget: form, preventDefault: () => { } } as any, "published");
+                                    handleSubmit(
+                                        { currentTarget: form, preventDefault: () => { } } as any,
+                                        "published"
+                                    );
                                 }
                             }}
                         >

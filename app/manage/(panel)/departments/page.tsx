@@ -8,9 +8,7 @@ import {
     deleteDepartment,
 } from "@/actions/admin";
 import { toast } from "sonner";
-import {
-    IconPlus, IconTrash, IconBuilding, IconUsers, IconX,
-} from "@tabler/icons-react";
+import { IconPlus, IconTrash, IconBuilding, IconUsers, IconX } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,8 +18,6 @@ export default function ManageDepartmentsPage() {
     const [loading, setLoading] = useState(true);
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [showModal, setShowModal] = useState(false);
-
-    // Form state
     const [deptName, setDeptName] = useState("");
     const [deptDesc, setDeptDesc] = useState("");
     const [creating, setCreating] = useState(false);
@@ -38,11 +34,16 @@ export default function ManageDepartmentsPage() {
     async function handleCreate(e: React.FormEvent) {
         e.preventDefault();
         setCreating(true);
-        const result = await createDepartment({ name: deptName.trim(), description: deptDesc.trim() || undefined });
+        const result = await createDepartment({
+            name: deptName.trim(),
+            description: deptDesc.trim() || undefined,
+        });
         setCreating(false);
         if (result.success) {
             toast.success(`Department "${deptName.trim()}" created.`);
-            setDeptName(""); setDeptDesc(""); setShowModal(false);
+            setDeptName("");
+            setDeptDesc("");
+            setShowModal(false);
             load();
         } else {
             toast.error(result.error ?? "Failed to create department.");
@@ -71,7 +72,7 @@ export default function ManageDepartmentsPage() {
                 </div>
                 <Button
                     onClick={() => setShowModal(true)}
-                    className="bg-zinc-900 hover:bg-zinc-700 text-white text-sm flex items-center gap-2"
+                    className="bg-primary hover:bg-primary/80 text-primary-foreground text-sm flex items-center gap-2"
                 >
                     <IconPlus size={16} />
                     New Department
@@ -95,7 +96,10 @@ export default function ManageDepartmentsPage() {
                     <div className="px-5 py-16 text-center">
                         <IconBuilding size={40} className="mx-auto text-zinc-200 mb-3" />
                         <p className="text-sm text-zinc-400">No departments yet.</p>
-                        <button onClick={() => setShowModal(true)} className="mt-3 text-sm text-orange-600 font-medium hover:underline">
+                        <button
+                            onClick={() => setShowModal(true)}
+                            className="mt-3 text-sm text-orange-600 font-medium hover:underline"
+                        >
                             Create your first department →
                         </button>
                     </div>
@@ -133,20 +137,24 @@ export default function ManageDepartmentsPage() {
                 )}
             </div>
 
-            {/* Create Modal */}
             {showModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
                     <div className="w-full max-w-md bg-white rounded-2xl border border-zinc-200 shadow-xl p-6">
                         <div className="flex items-center justify-between mb-5">
                             <h2 className="text-lg font-bold text-zinc-900">New Department</h2>
-                            <button onClick={() => setShowModal(false)} className="p-1.5 text-zinc-400 hover:text-zinc-700 rounded-lg hover:bg-zinc-100 transition-colors">
+                            <button
+                                onClick={() => setShowModal(false)}
+                                className="p-1.5 text-zinc-400 hover:text-zinc-700 rounded-lg hover:bg-zinc-100 transition-colors"
+                            >
                                 <IconX size={18} />
                             </button>
                         </div>
 
                         <form onSubmit={handleCreate} className="space-y-4">
                             <div>
-                                <Label htmlFor="deptName">Department Name <span className="text-red-500">*</span></Label>
+                                <Label htmlFor="deptName">
+                                    Department Name <span className="text-red-500">*</span>
+                                </Label>
                                 <Input
                                     id="deptName"
                                     value={deptName}
@@ -169,8 +177,19 @@ export default function ManageDepartmentsPage() {
                                 />
                             </div>
                             <div className="flex gap-3 pt-1">
-                                <Button type="button" variant="outline" onClick={() => setShowModal(false)} className="flex-1">Cancel</Button>
-                                <Button type="submit" disabled={creating || !deptName.trim()} className="flex-1 bg-zinc-900 hover:bg-zinc-700 text-white">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => setShowModal(false)}
+                                    className="flex-1"
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    type="submit"
+                                    disabled={creating || !deptName.trim()}
+                                    className="flex-1 bg-primary hover:bg-primary/80 text-primary-foreground"
+                                >
                                     {creating ? "Creating…" : "Create Department"}
                                 </Button>
                             </div>

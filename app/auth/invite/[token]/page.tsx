@@ -4,73 +4,66 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
-import { IconCircleCheck } from "@tabler/icons-react";
+import { IconCircleCheck, IconLoader2 } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+
+type PageState = "loading" | "set-password" | "existing-user" | "done" | "error";
 
 export default function AcceptInvitePage() {
     const router = useRouter();
     const params = useParams();
     const token = params.token as string;
 
+    const [pageState, setPageState] = useState<PageState>("loading");
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
     const [error, setError] = useState<string | null>(null);
-    const [loading, setLoading] = useState(false);
-    const [done, setDone] = useState(false);
-
-    // Check if the invited email already has an account — if so, skip
-    // the password form and just accept the invite directly.
-    const [isExistingUser, setIsExistingUser] = useState(false);
-    const [checking, setChecking] = useState(true);
+    const [submitting, setSubmitting] = useState(false);
+    const [inviteInfo, setInviteInfo] = useState<{ name?: string; department?: string } | null>(null);
 
     useEffect(() => {
-        if (!token) return;
-
-        async function checkInvite() {
+        async function checkToken() {
             try {
-                const res = await fetch(`/api/auth/invite/check?token=${token}`);
+                const res = await fetch("/api/auth/invite/check", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ token }),
+                });
                 const data = await res.json();
+
+                if (!data.success) {
+                    setError(data.error ?? "Invalid or expired invite link.");
+                    setPageState("error");
+                    return;
+                }
+
+                setInviteInfo({ name: data.name, department: data.department });
+
                 if (data.userExists) {
-                    setIsExistingUser(true);
+                    const acceptRes = await fetch("/api/auth/invite/accept", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ token, skipPassword: true }),
+                    });
+                    const acceptData = await acceptRes.json();
+                    if (acceptData.success) {
+                        setPageState("existing-user");
+                    } else {
+                        setError(acceptData.error ?? "Something went wrong.");
+                        setPageState("error");
+                    }
+                } else {
+                    setPageState("set-password");
                 }
             } catch {
-                // If the check fails, fall through to show the password form
-            } finally {
-                setChecking(false);
+                setError("Something went wrong. Please try again.");
+                setPageState("error");
             }
         }
-
-        checkInvite();
+        checkToken();
     }, [token]);
-
-    // For existing users: just hit the accept endpoint without a password,
-    // then redirect straight to sign-in.
-    useEffect(() => {
-        if (!isExistingUser || checking) return;
-
-        async function acceptForExistingUser() {
-            setLoading(true);
-            const res = await fetch("/api/auth/invite/accept", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ token }),
-            });
-            const data = await res.json();
-            setLoading(false);
-
-            if (!data.success) {
-                setError(data.error);
-                return;
-            }
-
-            setDone(true);
-            setTimeout(() => router.push("/manage/login"), 2000);
-        }
-
-        acceptForExistingUser();
-    }, [isExistingUser, checking, token, router]);
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
@@ -85,7 +78,7 @@ export default function AcceptInvitePage() {
             return;
         }
 
-        setLoading(true);
+        setSubmitting(true);
 
         const res = await fetch("/api/auth/invite/accept", {
             method: "POST",
@@ -94,28 +87,66 @@ export default function AcceptInvitePage() {
         });
 
         const data = await res.json();
-        setLoading(false);
+        setSubmitting(false);
 
         if (!data.success) {
             setError(data.error);
             return;
         }
 
-        setDone(true);
-        setTimeout(() => router.push("/manage/login"), 2000);
+        setPageState("done");
+        setTimeout(() => router.push("/manage/login"), 2500);
     }
 
-    if (checking || (isExistingUser && !error)) {
+    if (pageState === "loading") {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-zinc-50 px-4">
-                <p className="text-sm text-zinc-500">
-                    {done ? "Redirecting you to sign in…" : "Verifying invite…"}
-                </p>
+            <div className="min-h-screen flex items-center justify-center bg-zinc-50">
+                <IconLoader2 size={28} className="text-zinc-400 animate-spin" />
             </div>
         );
     }
 
-    if (done) {
+    if (pageState === "error") {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-zinc-50 px-4">
+                <div className="w-full max-w-md bg-white rounded-2xl border border-zinc-200 p-8 shadow-sm text-center">
+                    <p className="text-sm text-red-500 mb-4">{error}</p>
+                    <Button asChild variant="outline">
+                        <Link href="/manage/login">Go to login</Link>
+                    </Button>
+                </div>
+            </div>
+        );
+    }
+
+    if (pageState === "existing-user") {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-zinc-50 px-4">
+                <div className="w-full max-w-md bg-white rounded-2xl border border-zinc-200 p-8 shadow-sm text-center">
+                    <div className="flex justify-center mb-4">
+                        <IconCircleCheck className="h-12 w-12 text-green-500" />
+                    </div>
+                    <p className="text-xs font-semibold text-orange-600 uppercase tracking-widest mb-2">
+                        Vigyanrang
+                    </p>
+                    <h1 className="text-xl font-bold text-zinc-900 mb-2">
+                        You&apos;ve been added{inviteInfo?.department ? ` to ${inviteInfo.department}` : ""}!
+                    </h1>
+                    <p className="text-sm text-zinc-500 mb-6">
+                        Your existing account has been linked. Sign in with your current password.
+                    </p>
+                    <Button
+                        asChild
+                        className="w-full bg-primary hover:bg-primary/80 text-primary-foreground"
+                    >
+                        <Link href="/manage/login">Sign in now</Link>
+                    </Button>
+                </div>
+            </div>
+        );
+    }
+
+    if (pageState === "done") {
         return (
             <div className="min-h-screen flex items-center justify-center bg-zinc-50 px-4">
                 <div className="w-full max-w-md bg-white rounded-2xl border border-zinc-200 p-8 shadow-sm text-center">
@@ -124,7 +155,7 @@ export default function AcceptInvitePage() {
                     </div>
                     <h1 className="text-xl font-bold text-zinc-900 mb-2">You&apos;re all set!</h1>
                     <p className="text-sm text-zinc-500">
-                        Your account has been updated. Redirecting you to sign in…
+                        Your account has been created. Redirecting you to sign in…
                     </p>
                 </div>
             </div>
@@ -140,7 +171,9 @@ export default function AcceptInvitePage() {
                     </p>
                     <h1 className="text-2xl font-bold text-zinc-900">Accept Invite</h1>
                     <p className="text-sm text-zinc-500 mt-1">
-                        Set a password to activate your account.
+                        {inviteInfo?.name ? `Hi ${inviteInfo.name}! ` : ""}
+                        Set a password to activate your account
+                        {inviteInfo?.department ? ` and join ${inviteInfo.department}` : ""}.
                     </p>
                 </div>
 
@@ -174,10 +207,10 @@ export default function AcceptInvitePage() {
 
                     <Button
                         type="submit"
-                        className="w-full bg-zinc-900 hover:bg-zinc-700 text-white"
-                        disabled={loading}
+                        className="w-full bg-primary hover:bg-primary/80 text-primary-foreground"
+                        disabled={submitting}
                     >
-                        {loading ? "Activating account…" : "Activate account"}
+                        {submitting ? "Activating account…" : "Activate account"}
                     </Button>
                 </form>
 

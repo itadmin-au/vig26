@@ -1,18 +1,14 @@
 // app/api/auth/invite/check/route.ts
-import { NextRequest } from "next/server";
 import { connectDB } from "@/lib/db";
-import { User, Invite } from "@/models";
+import { User, Invite, Department } from "@/models";
 import { isExpired } from "@/lib/utils";
 
-export async function GET(req: NextRequest) {
+export async function POST(req: Request) {
     try {
-        const token = req.nextUrl.searchParams.get("token");
+        const { token } = await req.json();
 
         if (!token) {
-            return Response.json(
-                { success: false, error: "Token is required." },
-                { status: 400 }
-            );
+            return Response.json({ success: false, error: "Token is required." }, { status: 400 });
         }
 
         await connectDB();
@@ -28,18 +24,24 @@ export async function GET(req: NextRequest) {
 
         if (isExpired(invite.expiresAt)) {
             return Response.json(
-                { success: false, error: "This invite link has expired." },
+                { success: false, error: "This invite link has expired. Ask your admin to resend." },
                 { status: 400 }
             );
         }
 
-        const existing = await User.findOne({ email: invite.email }).lean();
+        const existingUser = await User.findOne({ email: invite.email }).select("_id").lean();
+        const department = await Department.findById(invite.departmentId).select("name").lean();
 
-        return Response.json({ success: true, userExists: !!existing });
+        return Response.json({
+            success: true,
+            userExists: !!existingUser,
+            name: invite.name,
+            department: department?.name ?? null,
+        });
     } catch (err) {
         console.error("[invite/check]", err);
         return Response.json(
-            { success: false, error: "Something went wrong." },
+            { success: false, error: "Something went wrong. Please try again." },
             { status: 500 }
         );
     }
