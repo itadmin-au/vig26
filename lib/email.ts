@@ -1,4 +1,6 @@
+// lib/email.ts
 import { Resend } from "resend";
+import { generateTicketQRBuffer } from "@/lib/qrcode";
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
 
@@ -63,7 +65,6 @@ export async function sendTicketConfirmationEmail({
   eventTitle,
   eventDate,
   venue,
-  qrDataUrl,
   ticketId,
 }: {
   to: string;
@@ -71,42 +72,77 @@ export async function sendTicketConfirmationEmail({
   eventTitle: string;
   eventDate: string;
   venue?: string;
-  qrDataUrl: string;
+  /** qrDataUrl is no longer used — QR is generated fresh from ticketId */
+  qrDataUrl?: string;
   ticketId: string;
 }) {
   const dashboardLink = `${APP_URL}/dashboard`;
+  const cid = "qrcode@vigyanrang";
+
+  // Generate QR as a PNG buffer (works in all email clients via CID attachment)
+  const qrBuffer = await generateTicketQRBuffer(ticketId);
 
   await resend.emails.send({
     from: FROM,
     to,
     subject: `Your ticket for ${eventTitle} — Vigyanrang`,
+    attachments: [
+      {
+        filename: "ticket-qr.png",
+        content: qrBuffer,
+        // Inline content-id so <img src="cid:..."> works in email clients
+        contentType: "image/png",
+      },
+    ],
     html: `
       <div style="background-color: #f9fafb; padding: 40px 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
         <div style="max-width: 560px; margin: 0 auto; background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 40px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
           <h2 style="color: #D97706; margin-top: 0; font-size: 24px; font-weight: 700;">Vigyanrang</h2>
           <div style="height: 1px; background-color: #f3f4f6; margin: 24px 0;"></div>
-          <p style="font-size: 16px; color: #374151;">Hi ${name}, you're registered!</p>
+          <p style="font-size: 16px; color: #374151;">Hi ${name}, you're registered! 🎉</p>
+
+          <!-- Event card -->
           <div style="background-color: #fffaf5; border: 1px solid #ffedd5; border-radius: 8px; padding: 20px; margin: 24px 0;">
             <h3 style="margin: 0 0 12px 0; font-size: 18px; color: #111827;">${eventTitle}</h3>
-            <div style="margin-bottom: 8px; display: flex; align-items: center;">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D97706" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px; vertical-align: middle;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-              <span style="color: #6b7280; font-size: 14px;">${eventDate}</span>
-            </div>
-            ${venue ? `
-            <div style="display: flex; align-items: center;">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D97706" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px; vertical-align: middle;"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
-              <span style="color: #6b7280; font-size: 14px;">${venue}</span>
-            </div>` : ""}
+            <p style="color: #6b7280; font-size: 14px; margin: 0 0 6px 0;">📅 ${eventDate}</p>
+            ${venue ? `<p style="color: #6b7280; font-size: 14px; margin: 0;">📍 ${venue}</p>` : ""}
           </div>
+
+          <!-- QR code as attachment (renders inline in most clients) -->
           <div style="text-align: center; margin: 32px 0;">
-            <img src="${qrDataUrl}" alt="Your QR ticket" style="width: 200px; height: 200px; border: 1px solid #e5e7eb; padding: 10px; border-radius: 8px;" />
-            <p style="color: #9ca3af; font-size: 12px; margin-top: 12px;">Ticket ID: <span style="font-family: monospace;">${ticketId}</span></p>
+            <p style="font-size: 14px; font-weight: 600; color: #374151; margin-bottom: 16px;">Your Entry QR Code</p>
+            <img
+              src="cid:${cid}"
+              alt="QR Code"
+              width="200"
+              height="200"
+              style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px; display: block; margin: 0 auto;"
+            />
+            <p style="color: #9ca3af; font-size: 11px; margin-top: 12px; font-family: monospace;">
+              Ticket ID: ${ticketId}
+            </p>
           </div>
-          <p style="font-size: 15px; color: #4b5563; text-align: center; margin-bottom: 24px;">Please show this QR code at the entrance for a smooth check-in.</p>
+
+          <p style="font-size: 14px; color: #6b7280; text-align: center; margin-bottom: 28px;">
+            Show this QR code at the entrance for a smooth check-in.<br/>
+            The QR image is also attached to this email.
+          </p>
+
           <div style="text-align: center;">
-            <a href="${dashboardLink}" style="display: inline-block; background-color: #18181B; color: #ffffff; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">View My Tickets</a>
+            <a href="${dashboardLink}" style="display: inline-block; background-color: #18181B; color: #ffffff; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
+              View My Tickets
+            </a>
+          </div>
+
+          <div style="margin-top: 32px; padding-top: 20px; border-top: 1px solid #f3f4f6;">
+            <p style="color: #9ca3af; font-size: 12px; margin: 0; text-align: center;">
+              Can't see the QR? Open the attached <strong>ticket-qr.png</strong> file.
+            </p>
           </div>
         </div>
+        <p style="text-align: center; color: #9ca3af; font-size: 12px; margin-top: 24px;">
+          Sent by <a href="${APP_URL}" style="color: #9ca3af; text-decoration: underline;">Vigyanrang</a>
+        </p>
       </div>
     `,
   });
@@ -139,11 +175,12 @@ export async function sendTeamMemberInviteEmail({
             Great news! <span style="font-weight: 600; color: #111827;">${leaderName}</span> has registered you as a team member for <strong>${eventTitle}</strong>.
           </p>
           <p style="font-size: 16px; color: #374151; margin: 24px 0;">To access your ticket and event details, please create your Vigyanrang account:</p>
-          <a href="${signupLink}" style="display: inline-block; background-color: #18181B; color: #ffffff; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">Create My Account</a>
-          <div style="margin-top: 40px; padding: 16px; background-color: #f3f4f6; border-radius: 8px; display: flex; align-items: flex-start;">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4b5563" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 12px; flex-shrink: 0; vertical-align: middle;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+          <a href="${signupLink}" style="display: inline-block; background-color: #18181B; color: #ffffff; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
+            Create My Account
+          </a>
+          <div style="margin-top: 32px; padding: 16px; background-color: #f3f4f6; border-radius: 8px;">
             <p style="color: #4b5563; font-size: 13px; margin: 0; line-height: 20px;">
-              <strong>Note:</strong> Please use the same email address this invite was sent to (${to}) to ensure your ticket is linked correctly.
+              <strong>Important:</strong> Use the same email address this was sent to (${to}) when signing up so your ticket is linked correctly.
             </p>
           </div>
         </div>

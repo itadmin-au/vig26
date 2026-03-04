@@ -6,7 +6,6 @@ import { Event, Registration, Ticket, User } from "@/models";
 import { requireAuth, requireManagement, requireDepartmentAccess } from "@/lib/auth-helpers";
 import { createRegistrationSchema } from "@/lib/validations";
 import { generateQRToken, generateTeamId } from "@/lib/utils";
-import { generateTicketQR } from "@/lib/qrcode";
 import { sendTicketConfirmationEmail, sendTeamMemberInviteEmail } from "@/lib/email";
 import { serialize, formatEventDate } from "@/lib/utils";
 import type { IRegistration, ITicket } from "@/types";
@@ -30,10 +29,7 @@ export async function createRegistration(input: unknown) {
         return { success: false, error: "This event is fully booked." };
     }
 
-    const existingReg = await Registration.findOne({
-        eventId,
-        userId: session.user.id,
-    });
+    const existingReg = await Registration.findOne({ eventId, userId: session.user.id });
     if (existingReg) return { success: false, error: "You are already registered for this event." };
 
     const isTeam = event.isTeamEvent && teamMembers.length > 0;
@@ -52,8 +48,8 @@ export async function createRegistration(input: unknown) {
 
     const tickets: ITicket[] = [];
 
+    // ── Leader / solo ticket ──────────────────────────────────────────────────
     const leaderQR = generateQRToken();
-    const leaderQRDataUrl = await generateTicketQR(leaderQR);
 
     const leaderTicket = await Ticket.create({
         registrationId: registration._id,
@@ -68,13 +64,13 @@ export async function createRegistration(input: unknown) {
 
     const leaderUser = await User.findById(session.user.id);
     if (leaderUser) {
+        // Email now generates its own QR buffer internally — no need to pass qrDataUrl
         await sendTicketConfirmationEmail({
             to: leaderUser.email,
             name: leaderUser.name,
             eventTitle: event.title,
             eventDate: formatEventDate(event.date.start, event.date.end),
             venue: event.venue ?? undefined,
-            qrDataUrl: leaderQRDataUrl,
             ticketId: leaderQR,
         });
 
@@ -83,6 +79,7 @@ export async function createRegistration(input: unknown) {
         });
     }
 
+    // ── Team members ──────────────────────────────────────────────────────────
     if (isTeam) {
         for (const member of teamMembers) {
             const memberUser = await User.findOne({ email: member.email });
@@ -100,14 +97,12 @@ export async function createRegistration(input: unknown) {
             tickets.push(memberTicket);
 
             if (memberUser) {
-                const memberQRDataUrl = await generateTicketQR(memberQR);
                 await sendTicketConfirmationEmail({
                     to: memberUser.email,
                     name: memberUser.name,
                     eventTitle: event.title,
                     eventDate: formatEventDate(event.date.start, event.date.end),
                     venue: event.venue ?? undefined,
-                    qrDataUrl: memberQRDataUrl,
                     ticketId: memberQR,
                 });
                 await User.findByIdAndUpdate(memberUser._id, {
@@ -208,4 +203,15 @@ export async function verifyTicketQR(qrCode: string) {
     if (!ticket) return { success: false, error: "Invalid QR code." };
 
     return { success: true, data: serialize(ticket) };
+}
+
+export async function getUserRegistrationForEvent(eventId: string) {
+    try {
+        const session = await requireAuth();
+        await connectDB();
+        const reg = await Registration.findOne({ eventId, userId: session.user.id }).lean();
+        return { registered: !!reg };
+    } catch {
+        return { registered: false };
+    }
 }
