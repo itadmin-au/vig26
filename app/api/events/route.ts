@@ -16,7 +16,7 @@ export async function GET(req: Request) {
 
         const { skip } = getPaginationParams(page, limit);
 
-        const query: Record<string, unknown> = { status: "published" };
+        const query: Record<string, unknown> = { status: "published", "date.start": { $gt: new Date() } };
         if (type) query.type = type;
         if (category) query.category = category;
         if (search) {
