@@ -20,7 +20,7 @@ const NAV_LINKS = [
 
 const SOCIAL_LINKS = [
     { label: "Instagram ↗", href: "#" },
-    { label: "Twitter / X ↗", href: "#" },
+    // { label: "Twitter / X ↗", href: "#" },
     { label: "LinkedIn ↗", href: "#" },
 ];
 
@@ -31,436 +31,267 @@ export function PublicNavbar() {
     const [isOpen, setIsOpen] = useState(false);
     const pathname = usePathname();
 
-    // Home page has a dark background — use white text.
-    // Every other public page is light (bg-zinc-50) — use dark text.
     const isDark = pathname === "/";
 
     useGSAP(() => {
+        // Only set the overlay clip-path — don't touch vr-link-inner here
+        // because session-gated links may not be mounted yet
         gsap.set(".vr-overlay",      { clipPath: "polygon(0 0, 100% 0, 100% 0, 0 0)" });
-        gsap.set(".vr-link-inner",   { y: 90, opacity: 0 });
-        gsap.set(".vr-overlay-meta", { y: 20, opacity: 0 });
         gsap.set(".vr-overlay-bar",  { y: -20, opacity: 0 });
-
-        tl.current = gsap.timeline({ paused: true })
-            .to(".vr-overlay",      { clipPath: "polygon(0 0, 100% 0, 100% 100%, 0 100%)", duration: 0.9, ease: "power4.inOut" })
-            .to(".vr-overlay-bar",  { y: 0, opacity: 1, duration: 0.5, ease: "power3.out" }, "-=0.5")
-            .to(".vr-link-inner",   { y: 0, opacity: 1, duration: 0.7, stagger: 0.07, ease: "power3.out" }, "-=0.4")
-            .to(".vr-overlay-meta", { y: 0, opacity: 1, duration: 0.5, ease: "power3.out" }, "-=0.35");
+        gsap.set(".vr-overlay-meta", { y: 20,  opacity: 0 });
     }, { scope: container });
 
-    function openMenu()  { setIsOpen(true);  tl.current?.play(); }
-    function closeMenu() { tl.current?.reverse().then(() => setIsOpen(false)); }
+    function openMenu() {
+        setIsOpen(true);
 
-    const visibleLinks  = NAV_LINKS.filter((l) => !l.authRequired || !!session);
-    const signOutIndex  = String(visibleLinks.length + 1).padStart(2, "0");
+        // Query fresh every time so auth-gated links are always included
+        const linkInners = container.current?.querySelectorAll(".vr-link-inner") ?? [];
 
-    // ── Theme tokens ──────────────────────────────────────────────────────────
-    const logo      = isDark ? "text-white" : "text-zinc-900";
-    const hamLine   = isDark ? "bg-white" : "bg-zinc-800";
-    const ghostBtn  = isDark
-        ? "text-white/70 border-white/20 hover:text-white hover:border-white/50"
-        : "text-zinc-600 border-zinc-300 hover:text-zinc-900 hover:border-zinc-400";
-    const pillBorder = isDark
-        ? "border-white/15 hover:border-orange-500/50 hover:bg-orange-500/08"
-        : "border-zinc-200 hover:border-orange-400/60 hover:bg-orange-50";
-    const pillName  = isDark ? "text-white/80" : "text-zinc-700";
+        // Reset everything before playing
+        gsap.set(".vr-overlay",      { clipPath: "polygon(0 0, 100% 0, 100% 0, 0 0)" });
+        gsap.set(".vr-overlay-bar",  { y: -20, opacity: 0 });
+        gsap.set(".vr-overlay-meta", { y: 20,  opacity: 0 });
+        gsap.set(linkInners,         { y: 90,  opacity: 0 });
+
+        tl.current = gsap.timeline()
+            .to(".vr-overlay",      { clipPath: "polygon(0 0, 100% 0, 100% 100%, 0 100%)", duration: 0.9, ease: "power4.inOut" })
+            .to(".vr-overlay-bar",  { y: 0, opacity: 1, duration: 0.5, ease: "power3.out" }, "-=0.5")
+            .to(linkInners,         { y: 0, opacity: 1, duration: 0.7, stagger: 0.07, ease: "power3.out" }, "-=0.4")
+            .to(".vr-overlay-meta", { y: 0, opacity: 1, duration: 0.5, ease: "power3.out" }, "-=0.35");
+    }
+
+    function closeMenu() {
+        tl.current?.reverse().then(() => setIsOpen(false));
+    }
+
+    const visibleLinks = NAV_LINKS.filter((l) => !l.authRequired || !!session);
+    const signOutIndex = String(visibleLinks.length + 1).padStart(2, "0");
 
     return (
-        <div ref={container} className="vr-root">
+        <div ref={container} className="relative z-100">
 
-            {/* ── Fixed top bar ──────────────────────────────────────────── */}
-            <header className={`vr-topbar ${!isDark ? "vr-topbar--light" : ""}`}>
-                <Link href="/" className={`vr-logo ${logo}`}>
+            {/* ── Fixed top bar ──────────────────────────────────────────────── */}
+            <header className={[
+                "fixed top-0 left-0 w-full z-101",
+                "flex items-center justify-between",
+                "px-7 py-4",
+                "transition-all duration-200",
+                isDark
+                    ? "bg-transparent border-b border-transparent"
+                    : "bg-white/88 backdrop-blur-md border-b border-black/7 shadow-[0_1px_0_rgba(0,0,0,0.04)]",
+            ].join(" ")}>
+
+                <Link
+                    href="/"
+                    className={[
+                        "text-[1.05rem] font-bold tracking-[-0.03em] leading-none no-underline",
+                        isDark ? "text-white" : "text-zinc-900",
+                    ].join(" ")}
+                >
                     Vigyan<span className="text-orange-500">rang</span>
                 </Link>
 
-                <div className="vr-topbar-right">
+                <div className="flex items-center gap-3.5">
                     {session ? (
-                        /* Profile pill */
-                        <Link href="/account" className={`vr-profile-pill ${pillBorder}`}>
-                            <span className="vr-avatar">
+                        <Link
+                            href="/account"
+                            className={[
+                                "flex items-center gap-2 no-underline",
+                                "pl-1 pr-3 py-1 rounded-full border transition-all duration-200",
+                                isDark
+                                    ? "border-white/15 hover:border-orange-500/50 hover:bg-orange-500/8"
+                                    : "border-zinc-200 hover:border-orange-400/60 hover:bg-orange-50",
+                            ].join(" ")}
+                        >
+                            <span className="w-6.5 h-6.5 rounded-full bg-orange-500 text-white text-[0.68rem] font-bold flex items-center justify-center shrink-0">
                                 {session.user?.name?.[0]?.toUpperCase() ?? "U"}
                             </span>
-                            <span className={`vr-profile-name ${pillName}`}>
+                            <span className={[
+                                "text-[0.8rem] font-medium max-w-28 truncate hidden sm:block",
+                                isDark ? "text-white/80" : "text-zinc-700",
+                            ].join(" ")}>
                                 {session.user?.name?.split(" ")[0]}
                             </span>
                         </Link>
                     ) : (
-                        /* Auth buttons */
-                        <div className="vr-auth-btns">
-                            <Link href="/auth/login"  className={`vr-btn-ghost ${ghostBtn}`}>Sign In</Link>
-                            <Link href="/auth/signup" className="vr-btn-orange">Sign Up</Link>
+                        <div className="flex items-center gap-2">
+                            <Link
+                                href="/auth/login"
+                                className={[
+                                    "text-[0.8rem] font-medium no-underline",
+                                    "px-3.5 py-1.5 rounded-full border transition-all duration-200",
+                                    isDark
+                                        ? "text-white/70 border-white/20 hover:text-white hover:border-white/50"
+                                        : "text-zinc-600 border-zinc-300 hover:text-zinc-900 hover:border-zinc-400",
+                                ].join(" ")}
+                            >
+                                Sign In
+                            </Link>
+                            <Link
+                                href="/auth/signup"
+                                className="text-[0.8rem] font-semibold text-white no-underline px-3.5 py-1.5 rounded-full bg-orange-500 hover:bg-orange-600 transition-colors duration-200"
+                            >
+                                Sign Up
+                            </Link>
                         </div>
                     )}
 
-                    {/* Hamburger */}
-                    <button className="vr-hamburger" onClick={openMenu} aria-label="Open menu">
-                        <span className={`vr-line ${hamLine}`} />
-                        <span className={`vr-line ${hamLine}`} />
-                        <span className={`vr-line ${hamLine}`} />
+                    <button
+                        onClick={openMenu}
+                        aria-label="Open menu"
+                        className="flex flex-col gap-1.25 bg-transparent border-none p-1 cursor-pointer group"
+                    >
+                        <span className={[
+                            "block w-6 h-[1.5px] rounded-sm transition-all duration-300",
+                            isDark ? "bg-white" : "bg-zinc-800",
+                        ].join(" ")} />
+                        <span className={[
+                            "block w-6 h-[1.5px] rounded-sm transition-all duration-300 group-hover:w-4",
+                            isDark ? "bg-white" : "bg-zinc-800",
+                        ].join(" ")} />
                     </button>
                 </div>
             </header>
 
-            {/* ── Full-screen overlay (always dark) ─────────────────────── */}
-            <div className="vr-overlay" aria-hidden={!isOpen}>
-                <div className="vr-overlay-bar">
-                    <Link href="/" className="vr-logo text-white" onClick={closeMenu}>
+            {/* ── Full-screen overlay — always dark ─────────────────────────── */}
+            <div
+                aria-hidden={!isOpen}
+                className="vr-overlay fixed inset-0 w-screen h-screen bg-zinc-950 z-200 flex flex-col overflow-hidden"
+            >
+                <div className="absolute top-0 left-0 right-0 h-0.5 bg-linear-to-r from-orange-500 via-orange-400 to-transparent z-10" />
+
+                <div className="vr-overlay-bar flex items-center justify-between px-7 py-4 border-b border-white/6 shrink-0">
+                    <Link
+                        href="/"
+                        onClick={closeMenu}
+                        className="text-[1.05rem] font-bold tracking-[-0.03em] text-white no-underline leading-none"
+                    >
                         Vigyan<span className="text-orange-500">rang</span>
                     </Link>
-                    <button className="vr-close-btn" onClick={closeMenu} aria-label="Close">
+                    <button
+                        onClick={closeMenu}
+                        aria-label="Close menu"
+                        className="flex items-center gap-2 bg-transparent border border-white/12 text-white/65 px-3.5 py-1.5 rounded-full cursor-pointer text-[0.73rem] font-medium tracking-[0.06em] uppercase font-[inherit] transition-all duration-200 hover:border-orange-500 hover:text-orange-500 hover:bg-orange-500/6"
+                    >
                         Close &nbsp;✕
                     </button>
                 </div>
 
-                <div className="vr-overlay-body">
-                    <nav className="vr-nav">
+                <div className="flex-1 flex flex-col justify-between px-7 py-6 overflow-hidden">
+                    <nav className="flex flex-col">
                         {visibleLinks.map((link) => (
-                            <div className="vr-link-clip" key={link.path}>
+                            <div
+                                key={link.path}
+                                className="vr-link-clip overflow-hidden border-b border-white/5 first:border-t first:border-white/5"
+                            >
                                 <div className="vr-link-inner">
-                                    <Link href={link.path} className="vr-nav-link" onClick={closeMenu}>
-                                        <span className="vr-num">{link.num}</span>
-                                        <span className="vr-label">{link.label}</span>
-                                        <IconArrowUpRight size={26} className="vr-arrow" strokeWidth={1.5} />
+                                    <Link
+                                        href={link.path}
+                                        onClick={closeMenu}
+                                        className="group flex items-center gap-5 w-full py-2.5 no-underline text-white/85 transition-colors duration-200"
+                                    >
+                                        <span className="text-[0.6rem] text-white/18 font-medium tracking-widest w-8 shrink-0 pt-1">
+                                            {link.num}
+                                        </span>
+                                        <span className="text-[clamp(1.9rem,4.5vw,3.4rem)] font-light tracking-[-0.03em] leading-none transition-colors duration-200 group-hover:text-orange-500">
+                                            {link.label}
+                                        </span>
+                                        <IconArrowUpRight
+                                            size={26}
+                                            strokeWidth={1.5}
+                                            className="ml-auto text-orange-500 opacity-0 shrink-0 transition-all duration-200 group-hover:opacity-100 group-hover:translate-x-1 group-hover:-translate-y-1"
+                                        />
                                     </Link>
                                 </div>
                             </div>
                         ))}
 
-                        <div className="vr-link-clip">
+                        {/* Sign in / Sign out */}
+                        <div className="vr-link-clip overflow-hidden border-b border-white/5">
                             <div className="vr-link-inner">
                                 {session ? (
                                     <button
-                                        className="vr-nav-link vr-nav-btn"
                                         onClick={() => { closeMenu(); signOut({ callbackUrl: "/" }); }}
+                                        className="group flex items-center gap-5 w-full py-2.5 bg-transparent border-none cursor-pointer font-[inherit] text-white/85 transition-colors duration-200"
                                     >
-                                        <span className="vr-num">{signOutIndex}</span>
-                                        <span className="vr-label vr-label--muted">Sign Out</span>
+                                        <span className="text-[0.6rem] text-white/18 font-medium tracking-widest w-8 shrink-0 pt-1">
+                                            {signOutIndex}
+                                        </span>
+                                        <span className="text-[clamp(1.9rem,4.5vw,3.4rem)] font-light tracking-[-0.03em] leading-none text-white/28 transition-colors duration-200 group-hover:text-red-400/65">
+                                            Sign Out
+                                        </span>
                                     </button>
                                 ) : (
-                                    <Link href="/auth/login" className="vr-nav-link" onClick={closeMenu}>
-                                        <span className="vr-num">{signOutIndex}</span>
-                                        <span className="vr-label">Sign In</span>
-                                        <IconArrowUpRight size={26} className="vr-arrow" strokeWidth={1.5} />
+                                    <Link
+                                        href="/auth/login"
+                                        onClick={closeMenu}
+                                        className="group flex items-center gap-5 w-full py-2.5 no-underline text-white/85 transition-colors duration-200"
+                                    >
+                                        <span className="text-[0.6rem] text-white font-medium tracking-widest w-8 shrink-0 pt-1">
+                                            {signOutIndex}
+                                        </span>
+                                        <span className="text-[clamp(1.9rem,4.5vw,3.4rem)] font-light tracking-[-0.03em] leading-none transition-colors duration-200 group-hover:text-orange-500">
+                                            Sign In
+                                        </span>
+                                        <IconArrowUpRight
+                                            size={26}
+                                            strokeWidth={1.5}
+                                            className="ml-auto text-orange-500 opacity-0 shrink-0 transition-all duration-200 group-hover:opacity-100 group-hover:translate-x-1 group-hover:-translate-y-1"
+                                        />
                                     </Link>
                                 )}
                             </div>
                         </div>
                     </nav>
 
-                    <div className="vr-overlay-meta">
-                        <div className="vr-meta-col">
-                            <p className="vr-meta-heading">Follow</p>
+                    {/* Footer meta */}
+                    <div className="vr-overlay-meta flex gap-8 pt-6 border-t border-white/6 flex-wrap">
+                        <div className="flex flex-col gap-1 flex-1 min-w-32.5">
+                            <p className="text-[0.6rem] font-medium tracking-[0.12em] uppercase text-white/40 mb-1">
+                                Follow
+                            </p>
                             {SOCIAL_LINKS.map((s) => (
-                                <a key={s.label} href={s.href} className="vr-meta-link">{s.label}</a>
+                                <a
+                                    key={s.label}
+                                    href={s.href}
+                                    className="text-[0.78rem] text-white/50 no-underline normal-case tracking-normal font-normal leading-[1.85] hover:text-orange-500 transition-colors duration-200"
+                                >
+                                    {s.label}
+                                </a>
                             ))}
                         </div>
-                        <div className="vr-meta-col">
-                            <p className="vr-meta-heading">Contact</p>
-                            <a href="mailto:info@vigyanrang.com" className="vr-meta-link">info@vigyanrang.com</a>
+
+                        <div className="flex flex-col gap-1 flex-1 min-w-32.5">
+                            <p className="text-[0.6rem] font-medium tracking-[0.12em] uppercase text-white/40 mb-1">
+                                Contact
+                            </p>
+                            <a
+                                href="mailto:info@vigyanrang.com"
+                                className="text-[0.78rem] text-white/50 no-underline normal-case tracking-normal font-normal leading-[1.85] hover:text-orange-500 transition-colors duration-200"
+                            >
+                                info@vigyanrang.com
+                            </a>
                             {session && (
-                                <p className="vr-meta-user">
-                                    Signed in as <span>{session.user?.name?.split(" ")[0]}</span>
+                                <p className="text-[0.75rem] text-white/50 normal-case tracking-normal mt-1.5 leading-snug">
+                                    Signed in as{" "}
+                                    <span className="text-orange-500 font-semibold">
+                                        {session.user?.name?.split(" ")[0]}
+                                    </span>
                                 </p>
                             )}
                         </div>
-                        <div className="vr-meta-col vr-meta-col--right">
-                            <p className="vr-meta-tag">Atria Institute of Technology</p>
-                            <p className="vr-meta-tag vr-meta-tag--orange">Technical & Cultural Fest 2026</p>
+
+                        <div className="flex flex-col gap-1 flex-1 min-w-32.5 items-end text-right max-sm:items-start max-sm:text-left">
+                            <p className="text-[0.7rem] text-white/80 normal-case tracking-normal font-normal leading-[1.7]">
+                                Atria Institute of Technology
+                            </p>
+                            <p className="text-[0.7rem] text-orange-500 normal-case tracking-normal font-normal leading-[1.7]">
+                                Technical & Cultural Fest 2026
+                            </p>
                         </div>
                     </div>
                 </div>
             </div>
-
-            <style>{`
-                .vr-root { position: relative; z-index: 100; }
-
-                /* ── Top bar — transparent, no bg ─────────────────────────── */
-                .vr-topbar {
-                    position: fixed;
-                    top: 0; left: 0;
-                    width: 100%;
-                    padding: 1rem 1.75rem;
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    z-index: 101;
-                    /* Light pages get a subtle white border at the bottom */
-                    border-bottom: 1px solid transparent;
-                    background: transparent;
-                    transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
-                }
-
-                /* ── Light page topbar (non-home) ────────────────────────── */
-                .vr-topbar--light {
-                    border-bottom-color: rgba(0,0,0,0.07) !important;
-                    background: rgba(250,250,250,0.88) !important;
-                    backdrop-filter: blur(14px);
-                    -webkit-backdrop-filter: blur(14px);
-                    box-shadow: 0 1px 0 rgba(0,0,0,0.04);
-                }
-
-                /* ── Logo ─────────────────────────────────────────────────── */
-                .vr-logo {
-                    font-size: 1.05rem;
-                    font-weight: 700;
-                    text-decoration: none;
-                    letter-spacing: -0.03em;
-                    line-height: 1;
-                }
-
-                /* ── Right side ──────────────────────────────────────────── */
-                .vr-topbar-right {
-                    display: flex;
-                    align-items: center;
-                    gap: 0.875rem;
-                }
-
-                /* ── Auth buttons ─────────────────────────────────────────── */
-                .vr-auth-btns { display: flex; align-items: center; gap: 0.5rem; }
-
-                .vr-btn-ghost {
-                    font-size: 0.8rem;
-                    font-weight: 500;
-                    text-decoration: none;
-                    padding: 0.38rem 0.85rem;
-                    border-radius: 100px;
-                    border: 1px solid;
-                    transition: color 0.2s, border-color 0.2s;
-                }
-
-                .vr-btn-orange {
-                    font-size: 0.8rem;
-                    font-weight: 600;
-                    color: #fff;
-                    text-decoration: none;
-                    padding: 0.38rem 0.9rem;
-                    border-radius: 100px;
-                    background: #f97316;
-                    transition: background 0.2s;
-                }
-                .vr-btn-orange:hover { background: #ea6c10; }
-
-                /* ── Profile pill ─────────────────────────────────────────── */
-                .vr-profile-pill {
-                    display: flex;
-                    align-items: center;
-                    gap: 0.5rem;
-                    text-decoration: none;
-                    padding: 0.28rem 0.75rem 0.28rem 0.28rem;
-                    border-radius: 100px;
-                    border: 1px solid;
-                    transition: border-color 0.2s, background 0.2s;
-                }
-
-                .vr-avatar {
-                    width: 1.6rem;
-                    height: 1.6rem;
-                    border-radius: 50%;
-                    background: #f97316;
-                    color: #fff;
-                    font-size: 0.68rem;
-                    font-weight: 700;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    flex-shrink: 0;
-                }
-
-                .vr-profile-name {
-                    font-size: 0.8rem;
-                    font-weight: 500;
-                    max-width: 7rem;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                    white-space: nowrap;
-                }
-
-                /* ── Hamburger ────────────────────────────────────────────── */
-                .vr-hamburger {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 5px;
-                    cursor: pointer;
-                    background: none;
-                    border: none;
-                    padding: 4px;
-                }
-                .vr-line {
-                    display: block;
-                    width: 24px;
-                    height: 1.5px;
-                    border-radius: 2px;
-                    transition: width 0.3s ease;
-                }
-                .vr-hamburger:hover .vr-line:last-child { width: 15px; }
-
-                /* ── Overlay (always zinc-950 dark) ──────────────────────── */
-                .vr-overlay {
-                    position: fixed;
-                    inset: 0;
-                    background: #09090b;
-                    z-index: 200;
-                    display: flex;
-                    flex-direction: column;
-                    overflow: hidden;
-                }
-                .vr-overlay::before {
-                    content: '';
-                    position: absolute;
-                    top: 0; left: 0; right: 0;
-                    height: 2px;
-                    background: linear-gradient(90deg, #f97316, #fb923c, #fdba74, transparent);
-                }
-
-                .vr-overlay-bar {
-                    padding: 1rem 1.75rem;
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    border-bottom: 1px solid rgba(255,255,255,0.06);
-                    flex-shrink: 0;
-                }
-
-                .vr-close-btn {
-                    background: none;
-                    border: 1px solid rgba(255,255,255,0.12);
-                    color: rgba(255,255,255,0.65);
-                    padding: 0.38rem 0.9rem;
-                    border-radius: 100px;
-                    cursor: pointer;
-                    font-size: 0.73rem;
-                    font-weight: 500;
-                    letter-spacing: 0.06em;
-                    text-transform: uppercase;
-                    font-family: inherit;
-                    transition: border-color 0.2s, color 0.2s, background 0.2s;
-                }
-                .vr-close-btn:hover {
-                    border-color: #f97316;
-                    color: #f97316;
-                    background: rgba(249,115,22,0.06);
-                }
-
-                .vr-overlay-body {
-                    flex: 1;
-                    display: flex;
-                    flex-direction: column;
-                    justify-content: space-between;
-                    padding: 1.5rem 1.75rem 2.5rem;
-                    overflow: hidden;
-                }
-
-                .vr-nav { display: flex; flex-direction: column; }
-                .vr-link-clip {
-                    overflow: hidden;
-                    border-bottom: 1px solid rgba(255,255,255,0.05);
-                }
-                .vr-link-clip:first-child { border-top: 1px solid rgba(255,255,255,0.05); }
-
-                .vr-nav-link, .vr-nav-btn {
-                    display: flex;
-                    align-items: center;
-                    gap: 1.25rem;
-                    width: 100%;
-                    padding: 0.65rem 0;
-                    text-decoration: none;
-                    background: none;
-                    border: none;
-                    cursor: pointer;
-                    font-family: inherit;
-                    color: rgba(255,255,255,0.85);
-                    transition: color 0.2s;
-                }
-                .vr-nav-link:hover .vr-label   { color: #f97316; }
-                .vr-nav-link:hover .vr-arrow    { opacity: 1; transform: translateX(4px) translateY(-4px); }
-                .vr-nav-btn:hover  .vr-label--muted { color: rgba(255,100,100,0.65); }
-
-                .vr-num {
-                    font-size: 0.6rem;
-                    color: rgba(255,255,255,0.18);
-                    font-weight: 500;
-                    letter-spacing: 0.1em;
-                    width: 2rem;
-                    flex-shrink: 0;
-                    padding-top: 3px;
-                }
-                .vr-label {
-                    font-size: clamp(1.9rem, 4.5vw, 3.4rem);
-                    font-weight: 300;
-                    letter-spacing: -0.03em;
-                    line-height: 1;
-                    transition: color 0.25s ease;
-                }
-                .vr-label--muted { color: rgba(255,255,255,0.28); }
-
-                .vr-arrow {
-                    opacity: 0;
-                    transition: opacity 0.2s, transform 0.25s ease;
-                    color: #f97316;
-                    margin-left: auto;
-                    flex-shrink: 0;
-                }
-
-                /* ── Meta footer ──────────────────────────────────────────── */
-                .vr-overlay-meta {
-                    display: flex;
-                    gap: 2rem;
-                    padding-top: 1.5rem;
-                    border-top: 1px solid rgba(255,255,255,0.06);
-                    flex-wrap: wrap;
-                }
-                .vr-meta-col { display: flex; flex-direction: column; gap: 0.2rem; flex: 1; min-width: 130px; }
-                .vr-meta-col--right { align-items: flex-end; text-align: right; }
-
-                .vr-meta-heading {
-                    font-size: 0.6rem !important;
-                    font-weight: 500 !important;
-                    letter-spacing: 0.12em !important;
-                    text-transform: uppercase !important;
-                    color: rgba(255,255,255,0.18) !important;
-                    margin-bottom: 0.3rem;
-                }
-                .vr-meta-link {
-                    font-size: 0.78rem;
-                    color: rgba(255,255,255,0.4) !important;
-                    text-decoration: none;
-                    text-transform: none !important;
-                    letter-spacing: 0 !important;
-                    font-weight: 400;
-                    line-height: 1.85;
-                    transition: color 0.2s;
-                }
-                .vr-meta-link:hover { color: #f97316 !important; }
-
-                .vr-meta-user {
-                    font-size: 0.75rem;
-                    color: rgba(255,255,255,0.28) !important;
-                    text-transform: none !important;
-                    letter-spacing: 0 !important;
-                    margin-top: 0.4rem;
-                }
-                .vr-meta-user span { color: #f97316 !important; font-weight: 600; }
-
-                .vr-meta-tag {
-                    font-size: 0.7rem;
-                    color: rgba(255,255,255,0.16) !important;
-                    text-transform: none !important;
-                    letter-spacing: 0 !important;
-                    font-weight: 400;
-                    line-height: 1.7;
-                }
-                .vr-meta-tag--orange { color: rgba(249,115,22,0.4) !important; }
-
-                /* ── Mobile ───────────────────────────────────────────────── */
-                @media (max-width: 640px) {
-                    .vr-topbar      { padding: 0.9rem 1.25rem; }
-                    .vr-overlay-bar { padding: 0.9rem 1.25rem; }
-                    .vr-overlay-body { padding: 1.25rem 1.25rem 2rem; }
-                    .vr-profile-name { display: none; }
-                    .vr-meta-col--right { align-items: flex-start; text-align: left; }
-                }
-            `}</style>
         </div>
     );
 }

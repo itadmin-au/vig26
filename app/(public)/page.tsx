@@ -3,7 +3,9 @@ import Link from "next/link";
 
 export default function TemporaryLandingPage() {
     return (
-        <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center px-4">
+        // -mt-16 pulls the page back up behind the fixed navbar (escaping layout's pt-16)
+        // min-h-screen ensures it fills the full viewport height including that 64px
+        <div className="-mt-16 min-h-screen bg-zinc-950 flex flex-col items-center justify-center px-4">
             <div className="text-center max-w-lg">
                 <p className="text-xs font-semibold text-orange-500 uppercase tracking-widest mb-4">
                     Coming Soon
