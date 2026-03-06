@@ -3,7 +3,6 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { Navbar } from "@/components/navbar";
 import { useEvents } from "@/hooks/use-events";
 import { getCategories } from "@/actions/events";
 import {
@@ -45,7 +44,6 @@ function EventCard({ event }: { event: IEvent }) {
             href={`/events/${event.slug}`}
             className="group bg-white rounded-2xl border border-zinc-200 overflow-hidden hover:border-zinc-300 hover:shadow-md transition-all duration-200 flex flex-col"
         >
-            {/* Cover */}
             <div className="relative w-full h-44 bg-zinc-100 overflow-hidden">
                 {event.coverImage ? (
                     <img
@@ -58,7 +56,6 @@ function EventCard({ event }: { event: IEvent }) {
                         <IconCalendarEvent size={40} className="text-zinc-200" />
                     </div>
                 )}
-                {/* Price badge */}
                 <div className="absolute top-3 right-3">
                     <span className={`text-xs font-semibold px-2.5 py-1 rounded-full shadow-sm ${event.price === 0
                             ? "bg-green-500 text-white"
@@ -76,7 +73,6 @@ function EventCard({ event }: { event: IEvent }) {
                 )}
             </div>
 
-            {/* Body */}
             <div className="p-4 flex flex-col flex-1">
                 <div className="flex items-center gap-1.5 mb-2 flex-wrap">
                     <CategoryBadge category={event.category} />
@@ -135,14 +131,12 @@ export default function EventsPage() {
 
     const { events, total, hasMore, loading, filters, updateFilters, nextPage } = useEvents({ page: 1, limit: 12 });
 
-    // Load categories
     useEffect(() => {
         getCategories().then((cats: any[]) => {
             setCategories(cats.map((c) => c.slug));
         }).catch(() => { });
     }, []);
 
-    // Debounce search
     useEffect(() => {
         clearTimeout(debounceRef.current);
         debounceRef.current = setTimeout(() => {
@@ -158,11 +152,8 @@ export default function EventsPage() {
     const hasActiveFilters = filters.type || filters.category || filters.search;
 
     return (
-        <div className="min-h-screen bg-zinc-50">
-            <Navbar />
-
+        <div className="min-h-screen bg-zinc-50 pt-16">
             <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
-                {/* Header */}
                 <div className="mb-6">
                     <h1 className="text-2xl font-bold text-zinc-900">Events</h1>
                     <p className="text-sm text-zinc-500 mt-0.5">
@@ -170,9 +161,7 @@ export default function EventsPage() {
                     </p>
                 </div>
 
-                {/* Filters bar */}
                 <div className="bg-white rounded-2xl border border-zinc-200 p-4 mb-6 space-y-3">
-                    {/* Search */}
                     <div className="relative">
                         <IconSearch size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
                         <input
@@ -192,9 +181,7 @@ export default function EventsPage() {
                         )}
                     </div>
 
-                    {/* Type + Category filters */}
                     <div className="flex flex-wrap gap-2">
-                        {/* Type chips */}
                         {EVENT_TYPES.map((t) => (
                             <button
                                 key={t.value}
@@ -210,7 +197,6 @@ export default function EventsPage() {
 
                         <div className="w-px bg-zinc-200 mx-1 self-stretch" />
 
-                        {/* Category chips */}
                         {categories.map((cat) => (
                             <button
                                 key={cat}
@@ -236,7 +222,6 @@ export default function EventsPage() {
                     </div>
                 </div>
 
-                {/* Grid */}
                 {loading && events.length === 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                         {[...Array(6)].map((_, i) => <EventCardSkeleton key={i} />)}
@@ -265,7 +250,6 @@ export default function EventsPage() {
                             ))}
                         </div>
 
-                        {/* Load more */}
                         {hasMore && (
                             <div className="mt-10 text-center">
                                 <button

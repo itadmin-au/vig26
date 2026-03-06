@@ -8,7 +8,6 @@ import { useSession } from "next-auth/react";
 import dynamic from "next/dynamic";
 import { getEventBySlug } from "@/actions/events";
 import { getUserRegistrationForEvent } from "@/actions/registrations";
-import { Navbar } from "@/components/navbar";
 import {
     IconCalendarEvent, IconMapPin, IconUsers, IconCurrencyRupee,
     IconArrowLeft, IconTicket, IconAlertCircle, IconClock,
@@ -95,8 +94,7 @@ export default function EventDetailPage() {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-zinc-50">
-                <Navbar />
+            <div className="min-h-screen bg-zinc-50 pt-16">
                 <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 animate-pulse">
                     <div className="h-64 bg-zinc-200 rounded-2xl mb-6" />
                     <div className="grid lg:grid-cols-3 gap-6">
@@ -114,8 +112,7 @@ export default function EventDetailPage() {
 
     if (!event) {
         return (
-            <div className="min-h-screen bg-zinc-50">
-                <Navbar />
+            <div className="min-h-screen bg-zinc-50 pt-16">
                 <div className="text-center py-32">
                     <p className="text-zinc-500 font-medium text-lg">Event not found</p>
                     <Link href="/events" className="mt-4 inline-block text-sm text-orange-600 hover:underline">
@@ -141,11 +138,8 @@ export default function EventDetailPage() {
         : `/auth/login?callbackUrl=/events/${slug}/register`;
 
     return (
-        <div className="min-h-screen bg-zinc-50">
-            <Navbar />
-
+        <div className="min-h-screen bg-zinc-50 pt-16">
             <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
-                {/* Back */}
                 <Link
                     href="/events"
                     className="inline-flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-800 mb-5 transition-colors"
@@ -154,7 +148,6 @@ export default function EventDetailPage() {
                     All Events
                 </Link>
 
-                {/* Hero cover */}
                 {event.coverImage && (
                     <div className="w-full h-56 sm:h-72 rounded-2xl overflow-hidden mb-6">
                         <img src={event.coverImage} alt={event.title} className="w-full h-full object-cover" />
@@ -162,9 +155,7 @@ export default function EventDetailPage() {
                 )}
 
                 <div className="grid lg:grid-cols-3 gap-6 items-start">
-                    {/* ── Main content column ── */}
                     <div className="lg:col-span-2 space-y-5">
-                        {/* Title + badges */}
                         <div>
                             <div className="flex flex-wrap items-center gap-2 mb-3">
                                 <CategoryBadge category={event.category} />
@@ -185,7 +176,6 @@ export default function EventDetailPage() {
                             <h1 className="text-2xl sm:text-3xl font-bold text-zinc-900 leading-tight">{event.title}</h1>
                         </div>
 
-                        {/* Quick info strip */}
                         <div className="flex flex-wrap gap-4 py-4 border-y border-zinc-200">
                             <div className="flex items-center gap-2 text-sm text-zinc-600">
                                 <IconCalendarEvent size={16} className="text-zinc-400" />
@@ -211,7 +201,6 @@ export default function EventDetailPage() {
                             )}
                         </div>
 
-                        {/* Description */}
                         {event.description && (
                             <div className="bg-white rounded-2xl border border-zinc-200 p-5">
                                 <h2 className="text-sm font-semibold text-zinc-900 mb-3">About this event</h2>
@@ -221,7 +210,6 @@ export default function EventDetailPage() {
                             </div>
                         )}
 
-                        {/* Rules */}
                         {event.rules && (
                             <div className="bg-white rounded-2xl border border-zinc-200 p-5">
                                 <h2 className="text-sm font-semibold text-zinc-900 mb-3">Rules & Guidelines</h2>
@@ -231,7 +219,6 @@ export default function EventDetailPage() {
                             </div>
                         )}
 
-                        {/* Custom form preview */}
                         {event.customForm?.length > 0 && (
                             <div className="bg-white rounded-2xl border border-zinc-200 p-5">
                                 <div className="flex items-center gap-2 mb-4">
@@ -247,10 +234,9 @@ export default function EventDetailPage() {
                         )}
                     </div>
 
-                    {/* ── Sidebar ── */}
+                    {/* Sidebar */}
                     <div className="space-y-4 lg:sticky lg:top-20">
                         <div className="bg-white rounded-2xl border border-zinc-200 p-5 space-y-4">
-                            {/* Price */}
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-1.5 text-sm text-zinc-500">
                                     <IconCurrencyRupee size={15} />
@@ -265,7 +251,6 @@ export default function EventDetailPage() {
                                 </span>
                             </div>
 
-                            {/* Capacity */}
                             {event.capacity > 0 && (
                                 <div>
                                     <div className="flex items-center justify-between text-sm mb-1.5">
@@ -283,7 +268,6 @@ export default function EventDetailPage() {
                                 </div>
                             )}
 
-                            {/* Timing */}
                             <div className="flex items-start gap-2 text-sm text-zinc-500 bg-zinc-50 rounded-xl px-3 py-2.5">
                                 <IconClock size={15} className="shrink-0 mt-0.5 text-zinc-400" />
                                 <div>
@@ -297,7 +281,6 @@ export default function EventDetailPage() {
                                 </div>
                             </div>
 
-                            {/* Team note */}
                             {event.isTeamEvent && event.teamSize && (
                                 <div className="flex items-start gap-2 text-sm text-zinc-500 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2.5">
                                     <IconUsers size={15} className="shrink-0 mt-0.5 text-blue-400" />
@@ -308,7 +291,6 @@ export default function EventDetailPage() {
                                 </div>
                             )}
 
-                            {/* CTA */}
                             {isCancelled ? (
                                 <div className="flex items-center gap-2 text-sm text-red-500 bg-red-50 border border-red-100 rounded-xl px-3 py-2.5">
                                     <IconAlertCircle size={15} className="shrink-0" />

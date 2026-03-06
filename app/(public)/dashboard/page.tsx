@@ -5,7 +5,6 @@ import { useState } from "react";
 import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
 import { useMyTickets, useMyRegistrations } from "@/hooks/use-tickets";
-import { Navbar } from "@/components/navbar";
 import {
   IconTicket, IconCalendarEvent, IconMapPin, IconQrcode,
   IconX, IconUser, IconLogout, IconArrowUpRight,
@@ -77,7 +76,6 @@ function TicketCard({ ticket, onQR }: { ticket: ITicket; onQR: () => void }) {
           : "hover:shadow-md border-zinc-200"
       } ${isPast && !isCancelled ? "opacity-70" : ""}`}
     >
-      {/* Cover strip */}
       <div className="relative h-32 bg-zinc-100 overflow-hidden">
         {event?.coverImage ? (
           <img src={event.coverImage} alt="" className="w-full h-full object-cover" />
@@ -225,8 +223,6 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-zinc-50">
-      <Navbar />
-
       {activeQR && (
         <QRModal ticket={activeQR} onClose={() => setActiveQR(null)} />
       )}
