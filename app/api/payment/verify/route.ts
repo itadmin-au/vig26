@@ -1,7 +1,7 @@
 // app/api/payment/verify/route.ts
-import crypto from "crypto";
 import { connectDB } from "@/lib/db";
 import { Event, Registration, Ticket, User } from "@/models";
+import { getCashfreeOrder } from "@/lib/cashfree";
 import { requireAuth, unauthorizedResponse } from "@/lib/auth-helpers";
 import {
     generateQRToken,
@@ -21,33 +21,27 @@ export async function POST(req: Request) {
 
         const body = await req.json();
         const {
-            razorpay_order_id,
-            razorpay_payment_id,
-            razorpay_signature,
+            orderId,
             eventId,
             teamMembers = [],
             formResponses = [],
         } = body;
 
         // ── 1. Validate required payment fields ────────────────────────────────
-        if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+        if (!orderId || typeof orderId !== "string") {
             return Response.json(
-                { success: false, error: "Missing payment verification fields." },
+                { success: false, error: "Missing payment order ID." },
                 { status: 400 }
             );
         }
 
-        // ── 2. Verify HMAC signature ───────────────────────────────────────────
-        // Razorpay signs: sha256(order_id + "|" + payment_id) with key_secret
-        const expectedSignature = crypto
-            .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET!)
-            .update(`${razorpay_order_id}|${razorpay_payment_id}`)
-            .digest("hex");
+        // ── 2. Verify payment with Cashfree ────────────────────────────────────
+        const cfOrder = await getCashfreeOrder(orderId);
 
-        if (expectedSignature !== razorpay_signature) {
-            console.error("[payment/verify] Signature mismatch");
+        if (cfOrder.order_status !== "PAID") {
+            console.error("[payment/verify] Cashfree order not paid:", cfOrder.order_status);
             return Response.json(
-                { success: false, error: "Payment verification failed. Invalid signature." },
+                { success: false, error: "Payment not completed. Please try again." },
                 { status: 400 }
             );
         }
@@ -120,7 +114,7 @@ export async function POST(req: Request) {
             isTeamRegistration: isTeam,
             teamMembers: isTeam ? parsed.data.teamMembers : [],
             teamId,
-            paymentId: razorpay_payment_id,
+            paymentId: orderId,
             paymentStatus: "completed",
             status: "confirmed",
         });
@@ -218,7 +212,7 @@ export async function POST(req: Request) {
         return Response.json(
             {
                 success: false,
-                error: "Something went wrong confirming your payment. Please contact support with your payment ID.",
+                error: "Something went wrong confirming your payment. Please contact support with your order ID.",
             },
             { status: 500 }
         );

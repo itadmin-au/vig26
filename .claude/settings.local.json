@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -r \"window.Razorpay\\\\|new Razorpay\\\\|create-order\\\\|verify\" /c/Users/makpr/Desktop/projects/vig26/app --include=*.tsx --include=*.ts)"
+    ]
+  }
+}

@@ -19,13 +19,13 @@ import {
 } from "@tabler/icons-react";
 import type { IEvent, IFormResponse } from "@/types";
 
-// ─── Load Razorpay SDK ─────────────────────────────────────────────────────────
+// ─── Load Cashfree SDK ─────────────────────────────────────────────────────────
 
-function loadRazorpayScript(): Promise<boolean> {
+function loadCashfreeScript(): Promise<boolean> {
     return new Promise((resolve) => {
-        if (typeof window !== "undefined" && window.Razorpay) { resolve(true); return; }
+        if (typeof window !== "undefined" && "Cashfree" in window) { resolve(true); return; }
         const script = document.createElement("script");
-        script.src = "https://checkout.razorpay.com/v1/checkout.js";
+        script.src = "https://sdk.cashfree.com/js/v3/cashfree.js";
         script.onload = () => resolve(true);
         script.onerror = () => resolve(false);
         document.body.appendChild(script);
@@ -276,7 +276,7 @@ function ReviewStep({
             {isPaid && !paymentError && (
                 <div className="flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-xl p-4 text-sm text-blue-700">
                     <IconCreditCard size={16} className="shrink-0 mt-0.5 text-blue-400" />
-                    <span>You&apos;ll complete payment of <strong>₹{event.price}</strong> securely via Razorpay. Your ticket is confirmed only after successful payment.</span>
+                    <span>You&apos;ll complete payment of <strong>₹{event.price}</strong> securely via UPI. Your ticket is confirmed only after successful payment.</span>
                 </div>
             )}
 
@@ -375,9 +375,9 @@ export default function RegisterPage() {
     const [responses, setResponses] = useState<Record<string, string>>({});
     const [leaderName, setLeaderName] = useState("");
 
-    // Pre-load Razorpay SDK for paid events
+    // Pre-load Cashfree SDK for paid events
     useEffect(() => {
-        if (event && event.price > 0) loadRazorpayScript().catch(() => {});
+        if (event && event.price > 0) loadCashfreeScript().catch(() => {});
     }, [event]);
 
     useEffect(() => {
@@ -423,7 +423,7 @@ export default function RegisterPage() {
         setSubmitting(true);
         setPaymentError(null);
 
-        const sdkLoaded = await loadRazorpayScript();
+        const sdkLoaded = await loadCashfreeScript();
         if (!sdkLoaded) {
             setSubmitting(false);
             toast.error("Failed to load payment gateway. Please check your connection and try again.");
@@ -431,7 +431,7 @@ export default function RegisterPage() {
         }
 
         // Create order
-        let orderData: { orderId: string; amount: number; currency: string; keyId: string };
+        let orderData: { orderId: string; paymentSessionId: string; amount: number };
         try {
             const res = await fetch("/api/payment/create-order", {
                 method: "POST",
@@ -450,63 +450,54 @@ export default function RegisterPage() {
         const formResponses = buildFormResponses();
         const teamMembersPayload = event.isTeamEvent ? members : [];
 
-        // Open Razorpay checkout modal — all payment methods enabled
-        // UPI will appear automatically once the account is live
-        const rzp = new window.Razorpay({
-            key: orderData.keyId,
-            amount: orderData.amount,
-            currency: orderData.currency,
-            name: "Vigyanrang",
-            description: event.title,
-            order_id: orderData.orderId,
-            prefill: {
-                name: session.user.name ?? undefined,
-                email: session.user.email ?? undefined,
-            },
-            theme: { color: "#f97316" },
-            modal: {
-                escape: false,
-                confirm_close: true,
-                ondismiss: () => {
-                    setPaymentError("Payment was cancelled. Your registration has not been confirmed. You can try again.");
-                },
-            },
-            handler: async (response) => {
-                setSubmitting(true);
-                try {
-                    const verifyRes = await fetch("/api/payment/verify", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            razorpay_order_id: response.razorpay_order_id,
-                            razorpay_payment_id: response.razorpay_payment_id,
-                            razorpay_signature: response.razorpay_signature,
-                            eventId: event._id.toString(),
-                            teamMembers: teamMembersPayload,
-                            formResponses,
-                        }),
-                    });
-                    const verifyJson = await verifyRes.json();
-                    setSubmitting(false);
-                    if (verifyJson.success) {
-                        setTicketCount(verifyJson.data?.ticketCount ?? 1);
-                        setPaymentError(null);
-                        setDone(true);
-                    } else {
-                        setPaymentError(verifyJson.error ?? `Payment received (ID: ${response.razorpay_payment_id}) but registration failed. Please contact support.`);
-                    }
-                } catch {
-                    setSubmitting(false);
-                    setPaymentError(`Payment received (ID: ${response.razorpay_payment_id}) but we couldn't confirm your registration. Please contact support.`);
+        // Open Cashfree checkout modal (UPI only)
+        const cashfree = window.Cashfree({
+            mode: process.env.NODE_ENV === "production" ? "production" : "sandbox",
+        });
+
+        const result = await cashfree.checkout({
+            paymentSessionId: orderData.paymentSessionId,
+            redirectTarget: "_modal",
+        });
+
+        if (result.error) {
+            const msg = result.error.message ?? "";
+            const isCancelled = msg.toLowerCase().includes("cancel") || msg.toLowerCase().includes("close");
+            setPaymentError(
+                isCancelled
+                    ? "Payment was cancelled. Your registration has not been confirmed. You can try again."
+                    : msg || "Payment failed. Please try again."
+            );
+            return;
+        }
+
+        if (result.paymentDetails) {
+            setSubmitting(true);
+            try {
+                const verifyRes = await fetch("/api/payment/verify", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        orderId: orderData.orderId,
+                        eventId: event._id.toString(),
+                        teamMembers: teamMembersPayload,
+                        formResponses,
+                    }),
+                });
+                const verifyJson = await verifyRes.json();
+                setSubmitting(false);
+                if (verifyJson.success) {
+                    setTicketCount(verifyJson.data?.ticketCount ?? 1);
+                    setPaymentError(null);
+                    setDone(true);
+                } else {
+                    setPaymentError(verifyJson.error ?? `Payment received (Order: ${orderData.orderId}) but registration failed. Please contact support.`);
                 }
-            },
-        });
-
-        rzp.on("payment.failed", (response) => {
-            setPaymentError(response.error?.description ?? "Payment failed. Please try again with a different payment method.");
-        });
-
-        rzp.open();
+            } catch {
+                setSubmitting(false);
+                setPaymentError(`Payment received (Order: ${orderData.orderId}) but we couldn't confirm your registration. Please contact support.`);
+            }
+        }
     }, [event, session, members, responses]);
 
     async function handleSubmit() {

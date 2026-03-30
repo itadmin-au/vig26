@@ -1,7 +1,7 @@
 // app/api/payment/create-order/route.ts
 import { connectDB } from "@/lib/db";
-import { Event, Registration } from "@/models";
-import { getRazorpay } from "@/lib/razorpay";
+import { Event, Registration, User } from "@/models";
+import { createCashfreeOrder } from "@/lib/cashfree";
 import { requireAuth, unauthorizedResponse } from "@/lib/auth-helpers";
 
 export async function POST(req: Request) {
@@ -65,27 +65,28 @@ export async function POST(req: Request) {
             );
         }
 
-        // ── Create Razorpay order ──────────────────────────────────────────────
-        const razorpay = getRazorpay();
+        // ── Fetch user details needed by Cashfree ──────────────────────────────
+        const user = await User.findById(session.user.id).select("name email").lean();
 
-        const order = await razorpay.orders.create({
-            amount: event.price * 100, // convert ₹ to paise
-            currency: "INR",
-            receipt: `${session.user.id}_${eventId}`.slice(0, 40),
-            notes: {
-                eventId: eventId,
-                userId: session.user.id,
-                eventTitle: event.title,
-            },
+        // ── Create Cashfree order ──────────────────────────────────────────────
+        // Order ID: unique per attempt (timestamp suffix handles retries)
+        const orderId = `vig_${session.user.id.toString().slice(-10)}_${Date.now().toString(36)}`;
+
+        const order = await createCashfreeOrder({
+            orderId,
+            amount: event.price,
+            customerId: session.user.id,
+            customerName: (user as any)?.name ?? "Customer",
+            customerEmail: (user as any)?.email ?? "noreply@vigyanrang.in",
+            orderNote: event.title,
         });
 
         return Response.json({
             success: true,
             data: {
-                orderId: order.id,
-                amount: order.amount,
-                currency: order.currency,
-                keyId: process.env.RAZORPAY_KEY_ID,
+                orderId: order.order_id,
+                paymentSessionId: order.payment_session_id,
+                amount: event.price,
             },
         });
     } catch (err: any) {
