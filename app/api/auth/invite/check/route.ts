@@ -2,8 +2,14 @@
 import { connectDB } from "@/lib/db";
 import { User, Invite, Department } from "@/models";
 import { isExpired } from "@/lib/utils";
+import { checkRateLimit, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
 
 export async function POST(req: Request) {
+    // 10 invite-check attempts per IP per hour
+    if (!checkRateLimit(`invite-check:${getClientIp(req)}`, 10, 60 * 60 * 1000)) {
+        return rateLimitResponse(3600);
+    }
+
     try {
         const { token } = await req.json();
 

@@ -10,6 +10,14 @@ import {
 } from "@/lib/utils";
 import { sendPasswordResetEmail } from "@/lib/email";
 import { z } from "zod";
+import crypto from "crypto";
+
+// Hash a reset token with SHA-256 before storing in the DB.
+// The raw token is sent to the user; only the hash is persisted so a
+// database breach does not yield usable reset tokens.
+function hashResetToken(token: string): string {
+    return crypto.createHash("sha256").update(token).digest("hex");
+}
 
 // ─── Schemas ──────────────────────────────────────────────────────────────────
 
@@ -57,18 +65,19 @@ export async function requestPasswordReset(input: unknown) {
         return { success: true };
     }
 
-    const token = generateInviteToken(); // reuse same 32-byte hex token generator
+    const token = generateInviteToken(); // raw 32-byte hex — sent to user, never stored
+    const tokenHash = hashResetToken(token); // only the hash is persisted
     const expiresAt = new Date(Date.now() + 1000 * 60 * 60); // 1 hour
 
     await User.findByIdAndUpdate(user._id, {
-        passwordResetToken: token,
+        passwordResetToken: tokenHash,
         passwordResetExpires: expiresAt,
     });
 
     await sendPasswordResetEmail({
         to: user.email,
         name: user.name,
-        token,
+        token, // raw token goes in the email link
     });
 
     return { success: true };
@@ -81,7 +90,7 @@ export async function validateResetToken(token: string) {
 
     await connectDB();
 
-    const user = await User.findOne({ passwordResetToken: token });
+    const user = await User.findOne({ passwordResetToken: hashResetToken(token) });
 
     if (!user) return { valid: false, error: "Invalid or expired link." };
     if (!user.passwordResetExpires || isExpired(user.passwordResetExpires)) {
@@ -101,7 +110,7 @@ export async function resetPassword(input: unknown) {
 
     await connectDB();
 
-    const user = await User.findOne({ passwordResetToken: parsed.data.token });
+    const user = await User.findOne({ passwordResetToken: hashResetToken(parsed.data.token) });
 
     if (!user) {
         return { success: false, error: "Invalid or expired link." };

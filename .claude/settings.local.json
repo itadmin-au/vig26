@@ -4,7 +4,8 @@
       "Bash(grep -r \"window.Razorpay\\\\|new Razorpay\\\\|create-order\\\\|verify\" /c/Users/makpr/Desktop/projects/vig26/app --include=*.tsx --include=*.ts)",
       "Bash(npm install:*)",
       "Bash(node -e \"console.log\\(require\\(''./node_modules/three/package.json''\\).version\\)\")",
-      "Bash(find c:UsersmakprDesktopprojectsvig26appapiauth -type f -name *.ts)"
+      "Bash(find c:UsersmakprDesktopprojectsvig26appapiauth -type f -name *.ts)",
+      "Bash(mongodump --version)"
     ]
   }
 }

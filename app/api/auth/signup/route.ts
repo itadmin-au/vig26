@@ -28,16 +28,7 @@ export async function POST(req: Request) {
         // ── Check for existing account ─────────────────────────────────────────
         const existing = await User.findOne({ email });
         if (existing) {
-            // Differentiate error message based on how they signed up
-            if (existing.googleId && !existing.passwordHash) {
-                return Response.json(
-                    {
-                        success: false,
-                        error: "An account with this email already exists via Google. Please sign in with Google.",
-                    },
-                    { status: 409 }
-                );
-            }
+            // Return the same message regardless of auth provider to prevent enumeration.
             return Response.json(
                 { success: false, error: "An account with this email already exists." },
                 { status: 409 }

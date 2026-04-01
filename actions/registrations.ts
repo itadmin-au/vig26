@@ -193,6 +193,7 @@ export async function toggleAttendance(ticketId: string) {
 }
 
 export async function verifyTicketQR(qrCode: string) {
+    await requireManagement();
     await connectDB();
 
     const ticket = await Ticket.findOne({ qrCode })

@@ -138,17 +138,33 @@ export async function POST(req: Request) {
             event.isTeamEvent && parsed.data.teamMembers.length > 0;
         const teamId = isTeam ? generateTeamId() : undefined;
 
-        const registration = await Registration.create({
-            eventId: parsed.data.eventId,
-            userId: session.user.id,
-            formResponses: parsed.data.formResponses,
-            isTeamRegistration: isTeam,
-            teamMembers: isTeam ? parsed.data.teamMembers : [],
-            teamId,
-            paymentId: orderId,
-            paymentStatus: "completed",
-            status: "confirmed",
-        });
+        let registration;
+        try {
+            registration = await Registration.create({
+                eventId: parsed.data.eventId,
+                userId: session.user.id,
+                formResponses: parsed.data.formResponses,
+                isTeamRegistration: isTeam,
+                teamMembers: isTeam ? parsed.data.teamMembers : [],
+                teamId,
+                paymentId: orderId,
+                paymentStatus: "completed",
+                status: "confirmed",
+            });
+        } catch (createErr: any) {
+            // Duplicate key error — a concurrent request already created this registration.
+            // Return the existing one rather than failing or creating a duplicate.
+            if (createErr.code === 11000) {
+                const existing = await Registration.findOne({ paymentId: orderId });
+                if (existing) {
+                    return Response.json({
+                        success: true,
+                        data: { registration: serialize(existing.toObject()), ticketCount: 1 },
+                    });
+                }
+            }
+            throw createErr;
+        }
 
         // ── 7. Create tickets and send emails ──────────────────────────────────
         const leaderQR = generateQRToken();

@@ -44,7 +44,6 @@ const RegistrationSchema = new Schema<IRegistrationDocument>(
         paymentId: {
             type: String,
             default: null,
-            index: true,
         },
         paymentStatus: {
             type: String,
@@ -64,6 +63,9 @@ const RegistrationSchema = new Schema<IRegistrationDocument>(
 
 // ─── Compound index: one registration per user per event ─────────────────────
 RegistrationSchema.index({ eventId: 1, userId: 1 }, { unique: true });
+
+// ─── Unique index: one registration per paymentId (prevents race-condition duplicates) ──
+RegistrationSchema.index({ paymentId: 1 }, { unique: true, sparse: true });
 
 // ─── Post-save: increment event's registrationCount ──────────────────────────
 RegistrationSchema.post("save", async function () {

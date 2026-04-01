@@ -31,6 +31,15 @@ export async function POST(req: Request) {
         return Response.json({ error: "Missing signature" }, { status: 400 });
     }
 
+    // Reject stale or future-dated webhooks to prevent replay attacks.
+    // Cashfree sends x-webhook-timestamp as a Unix epoch in seconds.
+    const tsSeconds = parseInt(timestamp, 10);
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    if (isNaN(tsSeconds) || Math.abs(nowSeconds - tsSeconds) > 300) {
+        console.error("[webhook] Timestamp out of acceptable window:", timestamp);
+        return Response.json({ error: "Webhook timestamp invalid or expired" }, { status: 400 });
+    }
+
     if (!verifyCashfreeWebhook(rawBody, timestamp, signature)) {
         console.error("[webhook] Invalid Cashfree webhook signature");
         return Response.json({ error: "Invalid signature" }, { status: 401 });

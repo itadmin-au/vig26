@@ -43,14 +43,10 @@ export const authOptions: NextAuthOptions = {
                     email: credentials.email.toLowerCase().trim(),
                 }).select("+passwordHash");
 
-                if (!user) {
-                    throw new Error("No account found with this email");
-                }
-
-                if (!user.passwordHash) {
-                    throw new Error(
-                        "This account uses Google Sign-In. Please continue with Google."
-                    );
+                if (!user || !user.passwordHash) {
+                    // Use the same message regardless of whether the email exists
+                    // or the account uses Google-only — prevents account enumeration.
+                    throw new Error("Invalid email or password");
                 }
 
                 const isValid = await verifyPassword(
@@ -58,7 +54,7 @@ export const authOptions: NextAuthOptions = {
                     user.passwordHash
                 );
                 if (!isValid) {
-                    throw new Error("Incorrect password");
+                    throw new Error("Invalid email or password");
                 }
 
                 return {
@@ -143,6 +139,28 @@ export const authOptions: NextAuthOptions = {
                     token.departments = (dbUser.departments ?? []).map((d: any) =>
                         d.toString()
                     );
+                    token.lastChecked = Date.now();
+                }
+            }
+
+            // For subsequent requests (no account present), periodically re-fetch
+            // role and departments from DB. This ensures revoked/demoted management
+            // accounts lose access without waiting for a 30-day token expiry.
+            // Cache window: 5 minutes — worst-case privilege persistence after demotion.
+            if (!account && token.id) {
+                const lastChecked = (token.lastChecked as number) ?? 0;
+                if (Date.now() - lastChecked > 5 * 60 * 1000) {
+                    await connectDB();
+                    const dbUser = await User.findById(token.id)
+                        .select("role departments")
+                        .lean();
+                    if (dbUser) {
+                        token.role = dbUser.role;
+                        token.departments = (dbUser.departments ?? []).map((d: any) =>
+                            d.toString()
+                        );
+                    }
+                    token.lastChecked = Date.now();
                 }
             }
 

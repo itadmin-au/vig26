@@ -244,6 +244,12 @@ export async function cancelInvite(inviteId: string) {
     await requireManagement();
     await connectDB();
 
+    const invite = await Invite.findById(inviteId);
+    if (!invite) return { success: false, error: "Invite not found." };
+
+    // Ensure the caller has access to the department this invite belongs to
+    await requireDepartmentAccess(invite.departmentId.toString());
+
     await Invite.findByIdAndUpdate(inviteId, { status: "cancelled" });
     return { success: true };
 }

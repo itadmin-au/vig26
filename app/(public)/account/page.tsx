@@ -6,7 +6,7 @@ import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import {
     IconUser, IconMail, IconLock, IconLogout,
-    IconCheck, IconLoader2, IconAlertCircle, IconShield,
+    IconCheck, IconLoader2, IconAlertCircle, IconShield, IconPencil, IconX,
 } from "@tabler/icons-react";
 
 // ─── Section wrapper ──────────────────────────────────────────────────────────
@@ -44,6 +44,62 @@ function FieldRow({ label, value, icon: Icon }: {
                 <p className="text-sm font-medium text-zinc-800 truncate">{value}</p>
             </div>
         </div>
+    );
+}
+
+// ─── Edit name form ───────────────────────────────────────────────────────────
+
+function EditNameForm({ currentName, onSaved }: { currentName: string; onSaved: (name: string) => void }) {
+    const { update } = useSession();
+    const [name, setName] = useState(currentName);
+    const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+    const [errorMsg, setErrorMsg] = useState("");
+
+    async function handleSubmit(e: React.FormEvent) {
+        e.preventDefault();
+        setErrorMsg("");
+        if (name.trim() === currentName) { onSaved(currentName); return; }
+        setStatus("loading");
+        try {
+            const res = await fetch("/api/account/update-profile", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name: name.trim() }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error ?? "Something went wrong.");
+            await update({ name: data.name });
+            setStatus("success");
+            onSaved(data.name);
+        } catch (err: any) {
+            setErrorMsg(err.message);
+            setStatus("error");
+        }
+    }
+
+    return (
+        <form onSubmit={handleSubmit} className="flex items-center gap-2 mt-1">
+            <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                minLength={2}
+                className="flex-1 px-3 py-1.5 text-sm border border-zinc-200 rounded-xl bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-400 transition-colors"
+            />
+            <button
+                type="submit"
+                disabled={status === "loading"}
+                className="flex items-center gap-1 px-3 py-1.5 bg-zinc-900 hover:bg-zinc-700 text-white text-xs font-semibold rounded-xl transition-colors disabled:opacity-60"
+            >
+                {status === "loading" ? <IconLoader2 size={13} className="animate-spin" /> : <IconCheck size={13} />}
+                Save
+            </button>
+            <button type="button" onClick={() => onSaved(currentName)} className="p-1.5 text-zinc-400 hover:text-zinc-600">
+                <IconX size={14} />
+            </button>
+            {errorMsg && <span className="text-xs text-red-600">{errorMsg}</span>}
+        </form>
     );
 }
 
@@ -141,6 +197,8 @@ export default function AccountPage() {
     const { data: session } = useSession();
     const router = useRouter();
     const isOAuth = !!(session?.user as any)?.isOAuthUser;
+    const [editingName, setEditingName] = useState(false);
+    const displayName = session?.user?.name ?? "—";
 
     return (
         <div className="min-h-screen bg-zinc-50 pt-16">
@@ -156,10 +214,10 @@ export default function AccountPage() {
                 <Section title="Profile" description="Your account information.">
                     <div className="flex items-center gap-4 pb-4 mb-1 border-b border-zinc-100">
                         <div className="w-14 h-14 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 text-xl font-bold shrink-0">
-                            {session?.user?.name?.[0]?.toUpperCase() ?? "?"}
+                            {displayName[0]?.toUpperCase() ?? "?"}
                         </div>
                         <div>
-                            <p className="font-semibold text-zinc-900 text-base">{session?.user?.name}</p>
+                            <p className="font-semibold text-zinc-900 text-base">{displayName}</p>
                             <p className="text-sm text-zinc-400">{session?.user?.email}</p>
                             {(session?.user as any)?.role && (
                                 <span className="inline-block mt-1 text-xs px-2 py-0.5 rounded-full bg-orange-50 text-orange-600 font-medium capitalize">
@@ -169,7 +227,29 @@ export default function AccountPage() {
                         </div>
                     </div>
 
-                    <FieldRow label="Full name" value={session?.user?.name ?? "—"} icon={IconUser} />
+                    {/* Full name row with inline edit */}
+                    <div className="flex items-center gap-3 py-3 border-b border-zinc-100">
+                        <div className="w-8 h-8 rounded-lg bg-zinc-50 border border-zinc-100 flex items-center justify-center shrink-0">
+                            <IconUser size={14} className="text-zinc-400" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                            <p className="text-xs text-zinc-400">Full name</p>
+                            {editingName ? (
+                                <EditNameForm
+                                    currentName={displayName}
+                                    onSaved={() => setEditingName(false)}
+                                />
+                            ) : (
+                                <div className="flex items-center gap-2">
+                                    <p className="text-sm font-medium text-zinc-800 truncate">{displayName}</p>
+                                    <button onClick={() => setEditingName(true)} className="text-zinc-400 hover:text-zinc-600">
+                                        <IconPencil size={13} />
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
                     <FieldRow label="Email address" value={session?.user?.email ?? "—"} icon={IconMail} />
                     <FieldRow
                         label="Sign-in method"

@@ -21,9 +21,14 @@ export async function getEvents(
     if (filters.category) query.category = filters.category;
     if (filters.departmentId) query.department = filters.departmentId;
     if (filters.search) {
+        // Escape special regex characters to prevent ReDoS attacks (same as public API route)
+        const safeSearch = filters.search
+            .trim()
+            .slice(0, 100)
+            .replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         query.$or = [
-            { title: { $regex: filters.search, $options: "i" } },
-            { description: { $regex: filters.search, $options: "i" } },
+            { title: { $regex: safeSearch, $options: "i" } },
+            { description: { $regex: safeSearch, $options: "i" } },
         ];
     }
 
