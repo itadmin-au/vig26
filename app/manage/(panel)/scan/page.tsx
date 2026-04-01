@@ -393,42 +393,43 @@ function ManualInput({ onScan, disabled }: { onScan: (qr: string) => void; disab
     );
 }
 
-// ─── Session Stats Bar ────────────────────────────────────────────────────────
+// ─── Session Stats ────────────────────────────────────────────────────────────
 
-function StatsBar({
-    total,
+function SessionStats({
+    scanned,
     checkedIn,
+    alreadyIn,
     onReset,
 }: {
-    total: number;
+    scanned: number;
     checkedIn: number;
+    alreadyIn: number;
     onReset: () => void;
 }) {
-    const pct = total > 0 ? Math.round((checkedIn / total) * 100) : 0;
     return (
-        <div className="bg-white rounded-xl border border-zinc-200 p-4 flex items-center gap-4">
-            <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between text-xs text-zinc-500 mb-1.5">
-                    <span>Session check-ins</span>
-                    <span className="font-semibold text-zinc-900">
-                        {checkedIn} / {total} scanned
-                    </span>
-                </div>
-                <div className="h-1.5 bg-zinc-100 rounded-full overflow-hidden">
-                    <div
-                        className="h-full bg-green-400 rounded-full transition-all duration-500"
-                        style={{ width: `${pct}%` }}
-                    />
-                </div>
-            </div>
-            <div className="text-right shrink-0">
-                <p className="text-2xl font-bold text-zinc-900 leading-none">{pct}%</p>
+        <div className="bg-white rounded-xl border border-zinc-200 px-4 py-3">
+            <div className="flex items-center justify-between mb-2.5">
+                <span className="text-xs font-medium text-zinc-500">This session</span>
                 <button
                     onClick={onReset}
-                    className="text-xs text-zinc-400 hover:text-zinc-600 mt-1 transition-colors"
+                    className="text-xs text-zinc-400 hover:text-zinc-600 transition-colors"
                 >
-                    reset
+                    Reset
                 </button>
+            </div>
+            <div className="grid grid-cols-3 divide-x divide-zinc-100">
+                <div className="text-center pr-4">
+                    <p className="text-2xl font-bold text-zinc-900">{scanned}</p>
+                    <p className="text-xs text-zinc-400 mt-0.5">Scanned</p>
+                </div>
+                <div className="text-center px-4">
+                    <p className="text-2xl font-bold text-green-600">{checkedIn}</p>
+                    <p className="text-xs text-zinc-400 mt-0.5">Checked in</p>
+                </div>
+                <div className="text-center pl-4">
+                    <p className="text-2xl font-bold text-amber-500">{alreadyIn}</p>
+                    <p className="text-xs text-zinc-400 mt-0.5">Already in</p>
+                </div>
             </div>
         </div>
     );
@@ -440,7 +441,7 @@ export default function ManageScanPage() {
     const [mode, setMode] = useState<"camera" | "manual">("camera");
     const [scanState, setScanState] = useState<ScanState>({ status: "idle" });
     const [markingAttendance, setMarkingAttendance] = useState(false);
-    const [stats, setStats] = useState({ total: 0, checkedIn: 0 });
+    const [stats, setStats] = useState({ scanned: 0, checkedIn: 0, alreadyIn: 0 });
 
     const isResultState =
         scanState.status === "success" ||
@@ -462,13 +463,14 @@ export default function ManageScanPage() {
         }
 
         const ticket = result.data as unknown as VerifiedTicket;
-        setStats(prev => ({ ...prev, total: prev.total + 1 }));
 
-        setScanState(
-            ticket.attendanceStatus
-                ? { status: "already_checked_in", ticket }
-                : { status: "success", ticket }
-        );
+        if (ticket.attendanceStatus) {
+            setStats(prev => ({ ...prev, scanned: prev.scanned + 1, alreadyIn: prev.alreadyIn + 1 }));
+            setScanState({ status: "already_checked_in", ticket });
+        } else {
+            setStats(prev => ({ ...prev, scanned: prev.scanned + 1 }));
+            setScanState({ status: "success", ticket });
+        }
     }
 
     async function handleMarkAttendance() {
@@ -513,11 +515,12 @@ export default function ManageScanPage() {
             </div>
 
             {/* Stats — visible after first scan */}
-            {stats.total > 0 && (
-                <StatsBar
-                    total={stats.total}
+            {stats.scanned > 0 && (
+                <SessionStats
+                    scanned={stats.scanned}
                     checkedIn={stats.checkedIn}
-                    onReset={() => setStats({ total: 0, checkedIn: 0 })}
+                    alreadyIn={stats.alreadyIn}
+                    onReset={() => setStats({ scanned: 0, checkedIn: 0, alreadyIn: 0 })}
                 />
             )}
 

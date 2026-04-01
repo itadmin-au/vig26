@@ -64,15 +64,18 @@ export async function createRegistration(input: unknown) {
 
     const leaderUser = await User.findById(session.user.id);
     if (leaderUser) {
-        // Email now generates its own QR buffer internally — no need to pass qrDataUrl
-        await sendTicketConfirmationEmail({
-            to: leaderUser.email,
-            name: leaderUser.name,
-            eventTitle: event.title,
-            eventDate: formatEventDate(event.date.start, event.date.end),
-            venue: event.venue ?? undefined,
-            ticketId: leaderQR,
-        });
+        try {
+            await sendTicketConfirmationEmail({
+                to: leaderUser.email,
+                name: leaderUser.name,
+                eventTitle: event.title,
+                eventDate: formatEventDate(event.date.start, event.date.end),
+                venue: event.venue ?? undefined,
+                ticketId: leaderQR,
+            });
+        } catch (err: any) {
+            console.error("[createRegistration] leader ticket email failed:", err?.message);
+        }
 
         await User.findByIdAndUpdate(session.user.id, {
             $addToSet: { registeredEvents: registration._id },
@@ -97,24 +100,32 @@ export async function createRegistration(input: unknown) {
             tickets.push(memberTicket);
 
             if (memberUser) {
-                await sendTicketConfirmationEmail({
-                    to: memberUser.email,
-                    name: memberUser.name,
-                    eventTitle: event.title,
-                    eventDate: formatEventDate(event.date.start, event.date.end),
-                    venue: event.venue ?? undefined,
-                    ticketId: memberQR,
-                });
+                try {
+                    await sendTicketConfirmationEmail({
+                        to: memberUser.email,
+                        name: memberUser.name,
+                        eventTitle: event.title,
+                        eventDate: formatEventDate(event.date.start, event.date.end),
+                        venue: event.venue ?? undefined,
+                        ticketId: memberQR,
+                    });
+                } catch (err: any) {
+                    console.error("[createRegistration] member ticket email failed:", member.email, err?.message);
+                }
                 await User.findByIdAndUpdate(memberUser._id, {
                     $addToSet: { registeredEvents: registration._id },
                 });
             } else {
-                await sendTeamMemberInviteEmail({
-                    to: member.email,
-                    memberName: member.name,
-                    leaderName: session.user.name ?? "Your team leader",
-                    eventTitle: event.title,
-                });
+                try {
+                    await sendTeamMemberInviteEmail({
+                        to: member.email,
+                        memberName: member.name,
+                        leaderName: session.user.name ?? "Your team leader",
+                        eventTitle: event.title,
+                    });
+                } catch (err: any) {
+                    console.error("[createRegistration] member invite email failed:", member.email, err?.message);
+                }
             }
         }
     }

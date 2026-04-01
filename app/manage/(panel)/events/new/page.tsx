@@ -173,6 +173,14 @@ export default function NewEventPage() {
     const [selectedDeptId, setSelectedDeptId] = useState("");
     // coverImageUrl holds the Cloudinary URL after upload (or null)
     const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null);
+    const [title, setTitle] = useState("");
+    const [eventType, setEventType] = useState("inter");
+    const [category, setCategory] = useState("");
+    const [dateStart, setDateStart] = useState("");
+    const [dateEnd, setDateEnd] = useState("");
+    const [venue, setVenue] = useState("");
+    const [capacity, setCapacity] = useState("0");
+    const [price, setPrice] = useState("0");
     const [description, setDescription] = useState("");
     const [rules, setRules] = useState("");
     const [formFields, setFormFields] = useState<IFormField[]>([]);
@@ -185,8 +193,14 @@ export default function NewEventPage() {
 
     useEffect(() => {
         getCategories().then((cats: any[]) => {
-            if (cats.length) setCategories(cats.map((c) => c.slug));
-        }).catch(() => { });
+            if (cats.length) {
+                const slugs = cats.map((c) => c.slug);
+                setCategories(slugs);
+                setCategory(slugs[0]);
+            } else {
+                setCategory(DEFAULT_CATEGORIES[0]);
+            }
+        }).catch(() => { setCategory(DEFAULT_CATEGORIES[0]); });
 
         if (isSuperAdmin) {
             getDepartments().then((depts: any[]) => {
@@ -232,9 +246,22 @@ export default function NewEventPage() {
             return;
         }
 
+        if (dateStart && dateEnd && new Date(dateEnd) <= new Date(dateStart)) {
+            toast.error("End date must be after the start date.");
+            return;
+        }
+
         setLoading(true);
 
-        const formData = new FormData(e.currentTarget);
+        const formData = new FormData();
+        formData.set("title", title);
+        formData.set("type", eventType);
+        formData.set("category", category);
+        formData.set("dateStart", dateStart);
+        formData.set("dateEnd", dateEnd);
+        formData.set("venue", venue);
+        formData.set("capacity", capacity);
+        formData.set("price", price);
         formData.set("status", status);
         formData.set("isTeamEvent", String(isTeamEvent));
         formData.set("description", description);
@@ -334,7 +361,8 @@ export default function NewEventPage() {
                                 </Label>
                                 <Input
                                     id="title"
-                                    name="title"
+                                    value={title}
+                                    onChange={(e) => setTitle(e.target.value)}
                                     placeholder="e.g. National Hackathon 2026"
                                     required
                                     className="mt-1"
@@ -386,7 +414,8 @@ export default function NewEventPage() {
                                     </Label>
                                     <select
                                         id="type"
-                                        name="type"
+                                        value={eventType}
+                                        onChange={(e) => setEventType(e.target.value)}
                                         required
                                         className="mt-1 w-full h-9 text-sm border border-zinc-200 rounded-lg px-3 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/20"
                                     >
@@ -401,7 +430,8 @@ export default function NewEventPage() {
                                     </Label>
                                     <select
                                         id="category"
-                                        name="category"
+                                        value={category}
+                                        onChange={(e) => setCategory(e.target.value)}
                                         required
                                         className="mt-1 w-full h-9 text-sm capitalize border border-zinc-200 rounded-lg px-3 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/20"
                                     >
@@ -417,19 +447,39 @@ export default function NewEventPage() {
                                     <Label htmlFor="dateStart">
                                         Start Date & Time <span className="text-red-500">*</span>
                                     </Label>
-                                    <Input id="dateStart" name="dateStart" type="datetime-local" required className="mt-1" />
+                                    <Input
+                                        id="dateStart"
+                                        type="datetime-local"
+                                        value={dateStart}
+                                        onChange={(e) => {
+                                            setDateStart(e.target.value);
+                                            if (dateEnd && e.target.value && new Date(dateEnd) <= new Date(e.target.value)) {
+                                                setDateEnd("");
+                                            }
+                                        }}
+                                        required
+                                        className="mt-1"
+                                    />
                                 </div>
                                 <div>
                                     <Label htmlFor="dateEnd">
                                         End Date & Time <span className="text-red-500">*</span>
                                     </Label>
-                                    <Input id="dateEnd" name="dateEnd" type="datetime-local" required className="mt-1" />
+                                    <Input
+                                        id="dateEnd"
+                                        type="datetime-local"
+                                        value={dateEnd}
+                                        min={dateStart || undefined}
+                                        onChange={(e) => setDateEnd(e.target.value)}
+                                        required
+                                        className="mt-1"
+                                    />
                                 </div>
                             </div>
 
                             <div>
                                 <Label htmlFor="venue">Venue</Label>
-                                <Input id="venue" name="venue" placeholder="e.g. Main Auditorium or Zoom link" className="mt-1" />
+                                <Input id="venue" value={venue} onChange={(e) => setVenue(e.target.value)} placeholder="e.g. Main Auditorium or Zoom link" className="mt-1" />
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
@@ -439,10 +489,10 @@ export default function NewEventPage() {
                                     </Label>
                                     <Input
                                         id="capacity"
-                                        name="capacity"
                                         type="number"
                                         min="0"
-                                        defaultValue="0"
+                                        value={capacity}
+                                        onChange={(e) => setCapacity(e.target.value)}
                                         className="mt-1"
                                     />
                                     <p className="text-xs text-zinc-400 mt-1">
@@ -451,7 +501,7 @@ export default function NewEventPage() {
                                 </div>
                                 <div>
                                     <Label htmlFor="price">Price (₹)</Label>
-                                    <Input id="price" name="price" type="number" min="0" defaultValue="0" className="mt-1" />
+                                    <Input id="price" type="number" min="0" value={price} onChange={(e) => setPrice(e.target.value)} className="mt-1" />
                                     <p className="text-xs text-zinc-400 mt-1">0 = free event.</p>
                                 </div>
                             </div>
@@ -603,15 +653,7 @@ export default function NewEventPage() {
                             type="button"
                             disabled={loading}
                             className="bg-zinc-900 hover:bg-zinc-700 text-white text-sm"
-                            onClick={(e) => {
-                                const form = (e.target as HTMLElement).closest("form") as HTMLFormElement;
-                                if (form) {
-                                    handleSubmit(
-                                        { currentTarget: form, preventDefault: () => { } } as any,
-                                        "published"
-                                    );
-                                }
-                            }}
+                            onClick={() => handleSubmit({ preventDefault: () => {} } as any, "published")}
                         >
                             Publish Event
                         </Button>

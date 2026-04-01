@@ -10,11 +10,12 @@ import {
     cancelInvite,
     removeDepartmentMember,
     upgradeExistingUser,
+    deleteUser,
 } from "@/actions/admin";
 import { toast } from "sonner";
 import {
     IconUserPlus, IconX, IconTrash, IconMail, IconClock,
-    IconShield, IconUsers, IconUserCheck, IconLoader2,
+    IconShield, IconUsers, IconUserCheck, IconLoader2, IconUserMinus,
 } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -201,6 +202,20 @@ export default function ManageUsersPage() {
         }
     }
 
+    async function handleDeleteUser(userId: string, name: string) {
+        if (!confirm(`Permanently delete ${name}? This will remove all their registrations, tickets, and department memberships.`)) return;
+        const result = await deleteUser(userId);
+        if (result.success) {
+            toast.success(`${name} deleted.`);
+            setMembers((prev) => prev.filter((m: any) => {
+                const uid = typeof m.userId === "object" ? m.userId?._id : m.userId;
+                return uid !== userId;
+            }));
+        } else {
+            toast.error(result.error ?? "Failed to delete user.");
+        }
+    }
+
     return (
         <div className="space-y-5">
             <div className="flex items-center justify-between">
@@ -269,7 +284,7 @@ export default function ManageUsersPage() {
                                     const name = typeof user === "object" ? user?.name : "—";
                                     const email = typeof user === "object" ? user?.email : "—";
                                     return (
-                                        <div key={userId} className="flex items-center gap-3 px-5 py-3.5 hover:bg-zinc-50 transition-colors">
+                                        <div key={member._id ?? userId} className="flex items-center gap-3 px-5 py-3.5 hover:bg-zinc-50 transition-colors">
                                             <div className="w-9 h-9 rounded-full bg-zinc-100 flex items-center justify-center shrink-0">
                                                 <span className="text-xs font-semibold text-zinc-500">
                                                     {name?.[0]?.toUpperCase() ?? "?"}
@@ -283,12 +298,22 @@ export default function ManageUsersPage() {
                                                 {roleLabel(member.role)}
                                             </span>
                                             {isSuperAdmin && (
-                                                <button
-                                                    onClick={() => handleRemoveMember(userId, name)}
-                                                    className="p-1.5 text-zinc-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                                                >
-                                                    <IconTrash size={15} />
-                                                </button>
+                                                <div className="flex items-center gap-1">
+                                                    <button
+                                                        onClick={() => handleRemoveMember(userId, name)}
+                                                        title="Remove from department"
+                                                        className="p-1.5 text-zinc-300 hover:text-orange-500 hover:bg-orange-50 rounded-lg transition-colors"
+                                                    >
+                                                        <IconUserMinus size={15} />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDeleteUser(userId, name)}
+                                                        title="Delete user account"
+                                                        className="p-1.5 text-zinc-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                                    >
+                                                        <IconTrash size={15} />
+                                                    </button>
+                                                </div>
                                             )}
                                         </div>
                                     );

@@ -2,7 +2,7 @@
 "use server";
 
 import { connectDB } from "@/lib/db";
-import { Event, Category } from "@/models";
+import { Event, Category, Registration, Ticket } from "@/models";
 import { requireManagement, requireDepartmentAccess, requireSuperAdmin } from "@/lib/auth-helpers";
 import { createEventSchema, updateEventSchema } from "@/lib/validations";
 import { serialize, getPaginationParams } from "@/lib/utils";
@@ -187,6 +187,23 @@ export async function updateEvent(id: string, formData: FormData) {
     return { success: true, data: serialize(updated) };
 }
 
+export async function cancelEvent(id: string) {
+    await connectDB();
+
+    const event = await Event.findById(id);
+    if (!event) return { success: false, error: "Event not found." };
+
+    await requireDepartmentAccess(event.department.toString());
+
+    if (event.status !== "published") {
+        return { success: false, error: "Only published events can be cancelled." };
+    }
+
+    await Event.findByIdAndUpdate(id, { status: "cancelled" });
+
+    return { success: true };
+}
+
 export async function deleteEvent(id: string) {
     await connectDB();
 
@@ -195,7 +212,13 @@ export async function deleteEvent(id: string) {
 
     await requireDepartmentAccess(event.department.toString());
 
-    await Event.findByIdAndUpdate(id, { status: "cancelled" });
+    if (event.status === "published") {
+        return { success: false, error: "Cancel the event before deleting it." };
+    }
+
+    await Ticket.deleteMany({ eventId: id });
+    await Registration.deleteMany({ eventId: id });
+    await Event.findByIdAndDelete(id);
 
     return { success: true };
 }

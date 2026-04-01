@@ -4,11 +4,11 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useManageEvents } from "@/hooks/use-manage-events";
-import { deleteEvent, publishEvent } from "@/actions/events";
+import { deleteEvent, publishEvent, cancelEvent } from "@/actions/events";
 import { toast } from "sonner";
 import {
     IconPlus, IconSearch, IconEdit, IconTrash, IconEye,
-    IconDots, IconSend, IconCalendarEvent, IconDownload,
+    IconDots, IconSend, IconCalendarEvent, IconDownload, IconBan,
 } from "@tabler/icons-react";
 import type { IEvent } from "@/types";
 import {
@@ -76,6 +76,7 @@ export default function ManageEventsPage() {
     const [openMenuId, setOpenMenuId] = useState<string | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [publishingId, setPublishingId] = useState<string | null>(null);
+    const [cancellingId, setCancellingId] = useState<string | null>(null);
     const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; eventId: string | null; title: string | null }>({
         open: false,
         eventId: null,
@@ -122,6 +123,18 @@ export default function ManageEventsPage() {
             refetch();
         } else {
             toast.error(result.error ?? "Failed to publish event.");
+        }
+    }
+
+    async function handleCancel(id: string) {
+        setCancellingId(id);
+        const result = await cancelEvent(id);
+        setCancellingId(null);
+        if (result.success) {
+            toast.success("Event cancelled.");
+            refetch();
+        } else {
+            toast.error(result.error ?? "Failed to cancel event.");
         }
     }
 
@@ -311,16 +324,27 @@ export default function ManageEventsPage() {
                                                     </button>
                                                 )}
                                                 <div className="my-1 border-t border-zinc-100" />
-                                                <button
-                                                    onClick={() => {
-                                                        setOpenMenuId(null);
-                                                        openDeleteDialog(event._id.toString(), event.title);
-                                                    }}
-                                                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-500 hover:bg-red-50"
-                                                >
-                                                    <IconTrash size={15} />
-                                                    Delete
-                                                </button>
+                                                {event.status === "published" ? (
+                                                    <button
+                                                        onClick={() => { setOpenMenuId(null); handleCancel(event._id.toString()); }}
+                                                        disabled={cancellingId === event._id.toString()}
+                                                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-orange-500 hover:bg-orange-50 disabled:opacity-50"
+                                                    >
+                                                        <IconBan size={15} />
+                                                        {cancellingId === event._id.toString() ? "Cancelling…" : "Cancel Event"}
+                                                    </button>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => {
+                                                            setOpenMenuId(null);
+                                                            openDeleteDialog(event._id.toString(), event.title);
+                                                        }}
+                                                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-500 hover:bg-red-50"
+                                                    >
+                                                        <IconTrash size={15} />
+                                                        Delete
+                                                    </button>
+                                                )}
                                             </div>
                                         </>
                                     )}

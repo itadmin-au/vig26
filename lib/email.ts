@@ -24,7 +24,7 @@ export async function sendManagementInviteEmail({
 }) {
   const link = `${APP_URL}/auth/invite/${token}`;
 
-  await resend.emails.send({
+  const { error } = await resend.emails.send({
     from: FROM,
     to,
     subject: `You've been invited to join ${departmentName} on Vigyanrang`,
@@ -57,6 +57,7 @@ export async function sendManagementInviteEmail({
       </div>
     `,
   });
+  if (error) throw new Error(`Resend error: ${error.message}`);
 }
 
 export async function sendTicketConfirmationEmail({
@@ -82,7 +83,7 @@ export async function sendTicketConfirmationEmail({
   // Generate QR as a PNG buffer (works in all email clients via CID attachment)
   const qrBuffer = await generateTicketQRBuffer(ticketId);
 
-  await resend.emails.send({
+  const { error: ticketError } = await resend.emails.send({
     from: FROM,
     to,
     subject: `Your ticket for ${eventTitle} — Vigyanrang`,
@@ -146,6 +147,7 @@ export async function sendTicketConfirmationEmail({
       </div>
     `,
   });
+  if (ticketError) throw new Error(`Resend error: ${ticketError.message}`);
 }
 
 export async function sendTeamMemberInviteEmail({
@@ -161,7 +163,7 @@ export async function sendTeamMemberInviteEmail({
 }) {
   const signupLink = `${APP_URL}/auth/signup`;
 
-  await resend.emails.send({
+  const { error: teamError } = await resend.emails.send({
     from: FROM,
     to,
     subject: `${leaderName} added you to a team for ${eventTitle}`,
@@ -187,6 +189,7 @@ export async function sendTeamMemberInviteEmail({
       </div>
     `,
   });
+  if (teamError) throw new Error(`Resend error: ${teamError.message}`);
 }
 
 export async function sendPasswordResetEmail({
@@ -200,7 +203,7 @@ export async function sendPasswordResetEmail({
 }) {
   const resetLink = `${APP_URL}/auth/reset-password/${token}`;
 
-  await resend.emails.send({
+  const { error: resetError } = await resend.emails.send({
     from: FROM,
     to,
     subject: "Reset your Vigyanrang password",
@@ -232,4 +235,5 @@ export async function sendPasswordResetEmail({
       </div>
     `,
   });
+  if (resetError) throw new Error(`Resend error: ${resetError.message}`);
 }

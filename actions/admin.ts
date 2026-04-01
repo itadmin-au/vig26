@@ -2,7 +2,7 @@
 "use server";
 
 import { connectDB } from "@/lib/db";
-import { User, Department, Invite, Event, Registration } from "@/models";
+import { User, Department, Invite, Event, Registration, Ticket } from "@/models";
 import {
     requireSuperAdmin,
     requireManagement,
@@ -168,14 +168,19 @@ export async function sendInvite(input: unknown) {
         expiresAt,
     });
 
-    await sendManagementInviteEmail({
-        to: email,
-        name,
-        departmentName: department.name,
-        invitedBy: session.user.name ?? "An admin",
-        token,
-        role: role === "dept_admin" ? "Admin" : "Coordinator",
-    });
+    try {
+        await sendManagementInviteEmail({
+            to: email,
+            name,
+            departmentName: department.name,
+            invitedBy: session.user.name ?? "An admin",
+            token,
+            role: role === "dept_admin" ? "Admin" : "Coordinator",
+        });
+    } catch (err: any) {
+        console.error("[sendInvite] email failed:", err?.message);
+        return { success: false, error: `Invite created but email failed to send: ${err?.message}` };
+    }
 
     return { success: true, message: `Invite sent to ${email}.` };
 }
@@ -238,6 +243,45 @@ export async function upgradeExistingUser(input: {
     }
 
     return { success: true, message: `${user.name} added to ${department.name}.` };
+}
+
+export async function deleteUser(userId: string) {
+    await requireSuperAdmin();
+    await connectDB();
+
+    const user = await User.findById(userId);
+    if (!user) return { success: false, error: "User not found." };
+
+    // 1. Remove from all department member arrays
+    await Department.updateMany(
+        { "members.userId": userId },
+        { $pull: { members: { userId } } }
+    );
+
+    // 2. Delete tickets
+    await Ticket.deleteMany({ userId });
+
+    // 3. Delete registrations and decrement event counts for confirmed ones
+    const confirmedRegs = await Registration.find({ userId, status: "confirmed" }).select("eventId").lean();
+    if (confirmedRegs.length > 0) {
+        const eventIds = confirmedRegs.map((r) => r.eventId);
+        await Event.updateMany(
+            { _id: { $in: eventIds } },
+            { $inc: { registrationCount: -1 } }
+        );
+    }
+    await Registration.deleteMany({ userId });
+
+    // 4. Cancel pending invites sent by this user
+    await Invite.updateMany(
+        { invitedBy: userId, status: "pending" },
+        { status: "cancelled" }
+    );
+
+    // 5. Delete the user
+    await User.findByIdAndDelete(userId);
+
+    return { success: true };
 }
 
 export async function cancelInvite(inviteId: string) {
