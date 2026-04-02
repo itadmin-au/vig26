@@ -16,7 +16,7 @@ export async function GET() {
 export async function POST(req: Request) {
     // Rate limit: 200 webhook calls per minute from any single IP (Cashfree uses a fixed IP range)
     const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-    if (!checkRateLimit(`webhook:${ip}`, 200, 60 * 1000)) {
+    if (!await checkRateLimit(`webhook:${ip}`, 200, 60 * 1000)) {
         return rateLimitResponse(60);
     }
 

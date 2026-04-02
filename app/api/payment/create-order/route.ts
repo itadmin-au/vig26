@@ -7,7 +7,7 @@ import { checkRateLimit, getClientIp, rateLimitResponse } from "@/lib/rate-limit
 
 export async function POST(req: Request) {
     // 20 order-creation attempts per IP per 10 minutes
-    if (!checkRateLimit(`create-order:${getClientIp(req)}`, 20, 10 * 60 * 1000)) {
+    if (!await checkRateLimit(`create-order:${getClientIp(req)}`, 20, 10 * 60 * 1000)) {
         return rateLimitResponse(60);
     }
 

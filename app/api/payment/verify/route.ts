@@ -18,7 +18,7 @@ import { createRegistrationSchema } from "@/lib/validations";
 
 export async function POST(req: Request) {
     // 30 verify attempts per IP per 10 minutes
-    if (!checkRateLimit(`verify:${getClientIp(req)}`, 30, 10 * 60 * 1000)) {
+    if (!await checkRateLimit(`verify:${getClientIp(req)}`, 30, 10 * 60 * 1000)) {
         return rateLimitResponse(60);
     }
 

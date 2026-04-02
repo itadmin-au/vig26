@@ -7,7 +7,7 @@ import { checkRateLimit, getClientIp, rateLimitResponse } from "@/lib/rate-limit
 
 export async function POST(req: Request) {
     // 5 invite-accept attempts per IP per 15 minutes
-    if (!checkRateLimit(`invite-accept:${getClientIp(req)}`, 5, 15 * 60 * 1000)) {
+    if (!await checkRateLimit(`invite-accept:${getClientIp(req)}`, 5, 15 * 60 * 1000)) {
         return rateLimitResponse(900);
     }
 

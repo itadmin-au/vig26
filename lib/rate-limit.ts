@@ -1,43 +1,84 @@
 // lib/rate-limit.ts
-// Simple in-memory rate limiter for API routes.
-// Works per-server-instance; for multi-instance deployments swap the store for Redis.
+// Redis-backed rate limiter using Upstash. Falls back to in-memory if Redis is unavailable.
+
+import { Redis } from "@upstash/redis";
+
+// ─── Redis client ──────────────────────────────────────────────────────────────
+
+let redis: Redis | null = null;
+
+if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+    redis = new Redis({
+        url: process.env.UPSTASH_REDIS_REST_URL,
+        token: process.env.UPSTASH_REDIS_REST_TOKEN,
+    });
+}
+
+// ─── In-memory fallback ────────────────────────────────────────────────────────
 
 interface RateLimitEntry {
     count: number;
     resetAt: number;
 }
 
-const store = new Map<string, RateLimitEntry>();
+const memoryStore = new Map<string, RateLimitEntry>();
 
-// Periodically purge expired entries to prevent unbounded memory growth
 setInterval(() => {
     const now = Date.now();
-    for (const [key, entry] of store.entries()) {
-        if (entry.resetAt < now) store.delete(key);
+    for (const [key, entry] of memoryStore.entries()) {
+        if (entry.resetAt < now) memoryStore.delete(key);
     }
-}, 5 * 60 * 1000); // every 5 minutes
+}, 5 * 60 * 1000);
+
+function checkMemory(key: string, max: number, windowMs: number): boolean {
+    const now = Date.now();
+    const entry = memoryStore.get(key);
+
+    if (!entry || entry.resetAt < now) {
+        memoryStore.set(key, { count: 1, resetAt: now + windowMs });
+        return true;
+    }
+    if (entry.count >= max) return false;
+    entry.count++;
+    return true;
+}
+
+// ─── Redis implementation ──────────────────────────────────────────────────────
+
+async function checkRedis(key: string, max: number, windowMs: number): Promise<boolean> {
+    const redisKey = `rl:${key}`;
+    const windowSec = Math.ceil(windowMs / 1000);
+
+    // INCR atomically increments (creates key at 0 if missing) and returns new value
+    const count = await redis!.incr(redisKey);
+
+    if (count === 1) {
+        // First request in this window — set TTL
+        await redis!.expire(redisKey, windowSec);
+    }
+
+    return count <= max;
+}
+
+// ─── Public API ────────────────────────────────────────────────────────────────
 
 /**
  * Returns true if the request is within the allowed limit, false if it should
- * be rejected. Modifies the store in place.
+ * be rejected.
  *
  * @param key        Unique key (e.g. IP + route)
  * @param max        Max allowed requests in the window
  * @param windowMs   Window duration in milliseconds
  */
-export function checkRateLimit(key: string, max: number, windowMs: number): boolean {
-    const now = Date.now();
-    const entry = store.get(key);
-
-    if (!entry || entry.resetAt < now) {
-        store.set(key, { count: 1, resetAt: now + windowMs });
-        return true;
+export async function checkRateLimit(key: string, max: number, windowMs: number): Promise<boolean> {
+    if (redis) {
+        try {
+            return await checkRedis(key, max, windowMs);
+        } catch {
+            // Redis unavailable — fall back to in-memory
+        }
     }
-
-    if (entry.count >= max) return false;
-
-    entry.count++;
-    return true;
+    return checkMemory(key, max, windowMs);
 }
 
 /**
