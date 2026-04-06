@@ -140,6 +140,10 @@ export interface IEvent {
     status: EventStatus;
     /** Maintained by pre/post hooks */
     registrationCount: number;
+    /** Google Sheets spreadsheet ID for live registration sync */
+    googleSheetId?: string;
+    /** Secret token for the public CSV feed URL */
+    csvToken?: string;
     createdAt: Date;
     updatedAt: Date;
 }

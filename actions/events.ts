@@ -180,6 +180,10 @@ export async function updateEvent(id: string, formData: FormData) {
         updates.teamSize = { min: teamSizeMin, max: teamSizeMax };
     }
 
+    // Google Sheet ID — stored directly, not part of the zod schema
+    const googleSheetId = (raw.googleSheetId as string | undefined)?.trim();
+    updates.googleSheetId = googleSheetId || null;
+
     const updated = await Event.findByIdAndUpdate(id, updates, {
         returnDocument: "after",
     }).lean();
@@ -266,4 +270,59 @@ export async function deleteCategory(id: string) {
 
     await Category.findByIdAndDelete(id);
     return { success: true };
+}
+
+export async function generateCsvToken(eventId: string) {
+    await requireManagement();
+    await connectDB();
+
+    const event = await Event.findById(eventId);
+    if (!event) return { success: false, error: "Event not found." };
+
+    await requireDepartmentAccess(event.department.toString());
+
+    const token = Array.from(crypto.getRandomValues(new Uint8Array(24)))
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
+
+    await Event.findByIdAndUpdate(eventId, { csvToken: token });
+    return { success: true, token };
+}
+
+export async function createAndLinkSheet(eventId: string) {
+    await requireManagement();
+    await connectDB();
+
+    const event = await Event.findById(eventId).lean();
+    if (!event) return { success: false, error: "Event not found." };
+
+    const { createEventSheet } = await import("@/lib/sheets");
+    const sheetId = await createEventSheet(
+        (event as any).title,
+        (event as any).customForm ?? []
+    );
+
+    await Event.findByIdAndUpdate(eventId, { googleSheetId: sheetId });
+
+    return { success: true, sheetId };
+}
+
+export async function syncEventToSheet(eventId: string) {
+    await requireManagement();
+    await connectDB();
+
+    const event = await Event.findById(eventId).lean();
+    if (!event) return { success: false, error: "Event not found." };
+
+    const googleSheetId = (event as any).googleSheetId as string | null;
+    if (!googleSheetId) return { success: false, error: "No Google Sheet linked to this event." };
+
+    const registrations = await Registration.find({ eventId, status: "confirmed" })
+        .populate("userId", "name email collegeId")
+        .lean();
+
+    const { syncAllRegistrationsToSheet } = await import("@/lib/sheets");
+    await syncAllRegistrationsToSheet(googleSheetId, serialize(event) as IEvent, registrations);
+
+    return { success: true, count: registrations.length };
 }

@@ -32,8 +32,9 @@ export async function POST(req: Request) {
     }
 
     // Reject stale or future-dated webhooks to prevent replay attacks.
-    // Cashfree sends x-webhook-timestamp as a Unix epoch in seconds.
-    const tsSeconds = parseInt(timestamp, 10);
+    // Cashfree sends x-webhook-timestamp in milliseconds (13 digits).
+    const tsRaw = parseInt(timestamp, 10);
+    const tsSeconds = tsRaw > 1e10 ? Math.floor(tsRaw / 1000) : tsRaw;
     const nowSeconds = Math.floor(Date.now() / 1000);
     if (isNaN(tsSeconds) || Math.abs(nowSeconds - tsSeconds) > 300) {
         console.error("[webhook] Timestamp out of acceptable window:", timestamp);
@@ -101,6 +102,28 @@ export async function POST(req: Request) {
                 reg.status = "confirmed";
                 await reg.save();
                 console.log("[webhook] Payment confirmed for order:", orderId);
+
+                // Sync to Google Sheet if configured (10s timeout to avoid 502s)
+                if ((event as any)?.googleSheetId) {
+                    try {
+                        const populatedReg = await Registration.findById(reg._id)
+                            .populate("userId", "name email collegeId")
+                            .lean();
+                        const { appendRegistrationRow } = await import("@/lib/sheets");
+                        await Promise.race([
+                            appendRegistrationRow(
+                                (event as any).googleSheetId,
+                                event as any,
+                                populatedReg
+                            ),
+                            new Promise<never>((_, reject) =>
+                                setTimeout(() => reject(new Error("Sheet sync timeout")), 8000)
+                            ),
+                        ]);
+                    } catch (sheetErr) {
+                        console.error("[webhook] Sheet sync failed (non-fatal):", sheetErr);
+                    }
+                }
             } else {
                 console.warn("[webhook] No registration found for order:", orderId);
             }

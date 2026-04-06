@@ -175,6 +175,7 @@ export default function EditEventPage() {
     const [isTeamEvent, setIsTeamEvent] = useState(false);
     const [teamSizeMin, setTeamSizeMin] = useState(2);
     const [teamSizeMax, setTeamSizeMax] = useState(5);
+    const [googleSheetId, setGoogleSheetId] = useState("");
     const [expanded, setExpanded] = useState({
         basic: true, details: true, rules: false, team: false, form: false,
     });
@@ -197,6 +198,7 @@ export default function EditEventPage() {
                 // Load existing cover image URL from DB into state
                 setCoverImageUrl(found.coverImage ?? null);
                 setDescription(found.description ?? "");
+                setGoogleSheetId(found.googleSheetId ?? "");
                 setRules(found.rules ?? "");
                 setSelectedDeptId(
                     typeof found.department === "string"
@@ -249,6 +251,7 @@ export default function EditEventPage() {
         formData.set("rules", rules);
         formData.set("departmentId", selectedDeptId);
         formData.set("customForm", JSON.stringify(formFields.map((f, i) => ({ ...f, order: i }))));
+        formData.set("googleSheetId", googleSheetId.trim());
 
         // Pass current Cloudinary URL (or empty string to signal removal)
         formData.set("coverImage", coverImageUrl ?? "");
@@ -569,6 +572,21 @@ export default function EditEventPage() {
                             </button>
                         </div>
                     )}
+                </div>
+
+                <div className="bg-white rounded-xl border border-zinc-200 px-5 py-4 space-y-2">
+                    <Label htmlFor="googleSheetId">Google Sheet ID</Label>
+                    <p className="text-xs text-zinc-400">
+                        Registrations will be appended automatically after each confirmed payment.
+                        Share the sheet with your service account email (Editor access).
+                    </p>
+                    <Input
+                        id="googleSheetId"
+                        value={googleSheetId}
+                        onChange={(e) => setGoogleSheetId(e.target.value)}
+                        placeholder="e.g. 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms"
+                        className="mt-1 font-mono text-xs"
+                    />
                 </div>
 
                 <div className="bg-white rounded-xl border border-zinc-200 px-5 py-4 flex items-center justify-between">

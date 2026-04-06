@@ -5,13 +5,13 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { getManageEvents } from "@/actions/events";
+import { getManageEvents, generateCsvToken } from "@/actions/events";
 import { getEventRegistrations, toggleAttendance } from "@/actions/registrations";
 import { toast } from "sonner";
 import {
     IconEdit, IconArrowLeft, IconDownload,
     IconCalendarEvent, IconMapPin, IconUsers, IconCurrencyRupee,
-    IconChevronDown,
+    IconChevronDown, IconLoader2, IconTableExport, IconRefresh, IconCopy,
 } from "@tabler/icons-react";
 import type { IEvent, IRegistration } from "@/types";
 import "@uiw/react-markdown-preview/markdown.css";
@@ -151,6 +151,7 @@ export default function ManageEventDetailPage() {
     const [togglingId, setTogglingId] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<"overview" | "registrations">("overview");
     const [exportMenuOpen, setExportMenuOpen] = useState(false);
+    const [generatingToken, setGeneratingToken] = useState(false);
 
     useEffect(() => {
         async function load() {
@@ -215,7 +216,7 @@ export default function ManageEventDetailPage() {
     return (
         <div className="space-y-5 max-w-4xl mx-auto">
             {/* Top bar */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
                 <button
                     onClick={() => router.back()}
                     className="flex items-center gap-1.5 text-sm border rounded-md px-3 py-1.5 text-zinc-500 hover:text-zinc-800 transition-colors"
@@ -231,6 +232,72 @@ export default function ManageEventDetailPage() {
                     Edit Event
                 </Link>
             </div>
+
+            {/* Live Google Sheets feed */}
+            {(() => {
+                const csvToken = (event as any).csvToken as string | null;
+                const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+                const feedUrl = csvToken
+                    ? `${appUrl}/api/events/${id}/registrations/csv?token=${csvToken}`
+                    : null;
+                const formula = feedUrl ? `=IMPORTDATA("${feedUrl}")` : null;
+
+                return (
+                    <div className="bg-white rounded-xl border border-zinc-200 px-5 py-4">
+                        <div className="flex items-start justify-between gap-4">
+                            <div>
+                                <p className="text-sm font-semibold text-zinc-900 flex items-center gap-2">
+                                    <IconTableExport size={16} className="text-green-600" />
+                                    Live Google Sheets Feed
+                                </p>
+                                <p className="text-xs text-zinc-400 mt-0.5">
+                                    {csvToken
+                                        ? "Paste this formula into cell A1 of any Google Sheet. It auto-refreshes every hour — no action needed when new registrations come in."
+                                        : "Generate a secure feed URL to import live registrations into Google Sheets."}
+                                </p>
+                            </div>
+                            <button
+                                onClick={async () => {
+                                    setGeneratingToken(true);
+                                    const result = await generateCsvToken(id);
+                                    setGeneratingToken(false);
+                                    if (result.success) {
+                                        setEvent((prev) => prev ? { ...prev, csvToken: (result as any).token } as any : prev);
+                                        toast.success(csvToken ? "Feed URL regenerated." : "Feed URL generated!");
+                                    } else {
+                                        toast.error(result.error ?? "Failed.");
+                                    }
+                                }}
+                                disabled={generatingToken}
+                                className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-600 border border-zinc-200 rounded-lg hover:bg-zinc-50 transition-colors disabled:opacity-50"
+                            >
+                                {generatingToken
+                                    ? <IconLoader2 size={13} className="animate-spin" />
+                                    : <IconRefresh size={13} />}
+                                {csvToken ? "Revoke & Regenerate" : "Generate URL"}
+                            </button>
+                        </div>
+
+                        {formula && (
+                            <div className="mt-3 flex items-center gap-2">
+                                <code className="flex-1 text-xs bg-zinc-50 border border-zinc-200 rounded-lg px-3 py-2 text-zinc-700 truncate font-mono">
+                                    {formula}
+                                </code>
+                                <button
+                                    onClick={() => {
+                                        navigator.clipboard.writeText(formula);
+                                        toast.success("Copied to clipboard!");
+                                    }}
+                                    className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-600 border border-zinc-200 rounded-lg hover:bg-zinc-50 transition-colors"
+                                >
+                                    <IconCopy size={13} />
+                                    Copy
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                );
+            })()}
 
             {/* Event header card */}
             <div className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
@@ -379,6 +446,7 @@ export default function ManageEventDetailPage() {
                         </div>
 
                         {registrations.length > 0 && (
+                            <div className="flex items-center gap-2">
                             <div className="relative">
                                 <button
                                     onClick={() => setExportMenuOpen((v) => !v)}
@@ -423,6 +491,7 @@ export default function ManageEventDetailPage() {
                                     </>
                                 )}
                             </div>
+                            </div>
                         )}
                     </div>
 
@@ -449,7 +518,9 @@ export default function ManageEventDetailPage() {
                                     {(registrations as any[]).map((reg) => (
                                         <tr key={reg._id} className="hover:bg-zinc-50 transition-colors">
                                             <td className="px-5 py-3.5">
-                                                <p className="font-medium text-zinc-900">{reg.userId?.name ?? "—"}</p>
+                                                <p className="font-medium text-zinc-900">
+                                                    {reg.userId?.name ?? (typeof reg.userId === "string" ? `User ${reg.userId.slice(-6)}` : "—")}
+                                                </p>
                                                 <p className="text-xs text-zinc-400">{reg.userId?.email ?? "—"}</p>
                                                 {reg.isTeamRegistration && reg.teamMembers?.length > 0 && (
                                                     <p className="text-xs text-zinc-400 mt-0.5">

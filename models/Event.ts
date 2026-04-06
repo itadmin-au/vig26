@@ -110,6 +110,14 @@ const EventSchema = new Schema<IEventDocument>(
       default: 0,
       min: 0,
     },
+    googleSheetId: {
+      type: String,
+      default: null,
+    },
+    csvToken: {
+      type: String,
+      default: null,
+    },
   },
   {
     timestamps: true,
