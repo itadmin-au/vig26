@@ -10,14 +10,26 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { name } = await req.json();
+    const { name, collegeId } = await req.json();
 
-    if (!name || typeof name !== "string" || name.trim().length < 2) {
-        return NextResponse.json({ error: "Name must be at least 2 characters." }, { status: 400 });
+    if (name !== undefined) {
+        if (!name || typeof name !== "string" || name.trim().length < 2) {
+            return NextResponse.json({ error: "Name must be at least 2 characters." }, { status: 400 });
+        }
     }
 
-    await connectDB();
-    await User.findByIdAndUpdate(session.user.id, { name: name.trim() });
+    if (collegeId !== undefined) {
+        if (!collegeId || typeof collegeId !== "string" || collegeId.trim().length < 1) {
+            return NextResponse.json({ error: "USN is required." }, { status: 400 });
+        }
+    }
 
-    return NextResponse.json({ success: true, name: name.trim() });
+    const update: Record<string, string> = {};
+    if (name !== undefined) update.name = name.trim();
+    if (collegeId !== undefined) update.collegeId = collegeId.trim().toUpperCase();
+
+    await connectDB();
+    const updated = await User.findByIdAndUpdate(session.user.id, update, { new: true }).select("name collegeId");
+
+    return NextResponse.json({ success: true, name: updated?.name, collegeId: updated?.collegeId });
 }

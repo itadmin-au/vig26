@@ -9,7 +9,7 @@ export const signupSchema = z.object({
         .min(8, "Password must be at least 8 characters")
         .regex(/[A-Z]/, "Must contain at least one uppercase letter")
         .regex(/[0-9]/, "Must contain at least one number"),
-    collegeId: z.string().trim().optional(),
+    collegeId: z.string().trim().min(1, "USN is required"),
 });
 
 export const loginSchema = z.object({

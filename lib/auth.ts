@@ -139,6 +139,8 @@ export const authOptions: NextAuthOptions = {
                     token.departments = (dbUser.departments ?? []).map((d: any) =>
                         d.toString()
                     );
+                    token.collegeId = dbUser.collegeId ?? null;
+                    token.needsOnboarding = !dbUser.collegeId;
                     token.lastChecked = Date.now();
                 }
             }
@@ -152,21 +154,40 @@ export const authOptions: NextAuthOptions = {
                 if (Date.now() - lastChecked > 5 * 60 * 1000) {
                     await connectDB();
                     const dbUser = await User.findById(token.id)
-                        .select("role departments")
+                        .select("role departments collegeId")
                         .lean();
                     if (dbUser) {
                         token.role = dbUser.role;
                         token.departments = (dbUser.departments ?? []).map((d: any) =>
                             d.toString()
                         );
+                        token.collegeId = dbUser.collegeId ?? null;
+                        token.needsOnboarding = !dbUser.collegeId;
                     }
                     token.lastChecked = Date.now();
                 }
             }
 
-            // Handle session update trigger (e.g. after profile edit)
-            if (trigger === "update" && session) {
-                token.name = session.name ?? token.name;
+            // Handle session update trigger (e.g. after profile edit / onboarding)
+            if (trigger === "update") {
+                if (session?.name) token.name = session.name;
+                // Re-fetch from DB to pick up collegeId changes immediately
+                if (token.id) {
+                    await connectDB();
+                    const dbUser = await User.findById(token.id)
+                        .select("role departments collegeId name")
+                        .lean();
+                    if (dbUser) {
+                        token.role = dbUser.role;
+                        token.departments = (dbUser.departments ?? []).map((d: any) =>
+                            d.toString()
+                        );
+                        token.collegeId = dbUser.collegeId ?? null;
+                        token.needsOnboarding = !dbUser.collegeId;
+                        token.name = dbUser.name ?? token.name;
+                    }
+                    token.lastChecked = Date.now();
+                }
             }
 
             return token;
@@ -178,6 +199,8 @@ export const authOptions: NextAuthOptions = {
                 session.user.id = token.id as string;
                 session.user.role = token.role as UserRole;
                 session.user.departments = (token.departments as string[]) ?? [];
+                session.user.needsOnboarding = token.needsOnboarding ?? false;
+                session.user.collegeId = token.collegeId ?? null;
             }
             return session;
         },

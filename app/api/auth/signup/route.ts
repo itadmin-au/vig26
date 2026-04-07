@@ -43,7 +43,7 @@ export async function POST(req: Request) {
             email,
             passwordHash,
             role: "student",
-            collegeId: collegeId ?? undefined,
+            collegeId,
             departments: [],
             registeredEvents: [],
         });

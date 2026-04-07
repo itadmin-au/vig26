@@ -6,7 +6,7 @@ import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import {
     IconUser, IconMail, IconLock, IconLogout,
-    IconCheck, IconLoader2, IconAlertCircle, IconShield, IconPencil, IconX,
+    IconCheck, IconLoader2, IconAlertCircle, IconShield, IconPencil, IconX, IconId,
 } from "@tabler/icons-react";
 
 // ─── Section wrapper ──────────────────────────────────────────────────────────
@@ -96,6 +96,62 @@ function EditNameForm({ currentName, onSaved }: { currentName: string; onSaved: 
                 Save
             </button>
             <button type="button" onClick={() => onSaved(currentName)} className="p-1.5 text-zinc-400 hover:text-zinc-600">
+                <IconX size={14} />
+            </button>
+            {errorMsg && <span className="text-xs text-red-600">{errorMsg}</span>}
+        </form>
+    );
+}
+
+// ─── Edit USN form ────────────────────────────────────────────────────────────
+
+function EditUSNForm({ currentUSN, onSaved }: { currentUSN: string; onSaved: (usn: string) => void }) {
+    const { update } = useSession();
+    const [usn, setUSN] = useState(currentUSN);
+    const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+    const [errorMsg, setErrorMsg] = useState("");
+
+    async function handleSubmit(e: React.FormEvent) {
+        e.preventDefault();
+        setErrorMsg("");
+        if (usn.trim().toUpperCase() === currentUSN) { onSaved(currentUSN); return; }
+        setStatus("loading");
+        try {
+            const res = await fetch("/api/account/update-profile", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ collegeId: usn.trim() }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error ?? "Something went wrong.");
+            await update({});
+            setStatus("success");
+            onSaved(data.collegeId);
+        } catch (err: any) {
+            setErrorMsg(err.message);
+            setStatus("error");
+        }
+    }
+
+    return (
+        <form onSubmit={handleSubmit} className="flex items-center gap-2 mt-1">
+            <input
+                type="text"
+                value={usn}
+                onChange={(e) => setUSN(e.target.value)}
+                required
+                placeholder="e.g. 1XX21XX000"
+                className="flex-1 px-3 py-1.5 text-sm border border-zinc-200 rounded-xl bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-400 transition-colors uppercase"
+            />
+            <button
+                type="submit"
+                disabled={status === "loading"}
+                className="flex items-center gap-1 px-3 py-1.5 bg-zinc-900 hover:bg-zinc-700 text-white text-xs font-semibold rounded-xl transition-colors disabled:opacity-60"
+            >
+                {status === "loading" ? <IconLoader2 size={13} className="animate-spin" /> : <IconCheck size={13} />}
+                Save
+            </button>
+            <button type="button" onClick={() => onSaved(currentUSN)} className="p-1.5 text-zinc-400 hover:text-zinc-600">
                 <IconX size={14} />
             </button>
             {errorMsg && <span className="text-xs text-red-600">{errorMsg}</span>}
@@ -198,7 +254,9 @@ export default function AccountPage() {
     const router = useRouter();
     const isOAuth = !!(session?.user as any)?.isOAuthUser;
     const [editingName, setEditingName] = useState(false);
+    const [editingUSN, setEditingUSN] = useState(false);
     const displayName = session?.user?.name ?? "—";
+    const displayUSN = (session?.user as any)?.collegeId ?? "";
 
     return (
         <div className="min-h-screen bg-zinc-50 pt-16">
@@ -251,6 +309,32 @@ export default function AccountPage() {
                     </div>
 
                     <FieldRow label="Email address" value={session?.user?.email ?? "—"} icon={IconMail} />
+
+                    {/* USN row with inline edit */}
+                    <div className="flex items-center gap-3 py-3 border-b border-zinc-100">
+                        <div className="w-8 h-8 rounded-lg bg-zinc-50 border border-zinc-100 flex items-center justify-center shrink-0">
+                            <IconId size={14} className="text-zinc-400" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                            <p className="text-xs text-zinc-400">USN</p>
+                            {editingUSN ? (
+                                <EditUSNForm
+                                    currentUSN={displayUSN}
+                                    onSaved={() => setEditingUSN(false)}
+                                />
+                            ) : (
+                                <div className="flex items-center gap-2">
+                                    <p className="text-sm font-medium text-zinc-800 truncate">
+                                        {displayUSN || <span className="text-zinc-400 font-normal">Not set</span>}
+                                    </p>
+                                    <button onClick={() => setEditingUSN(true)} className="text-zinc-400 hover:text-zinc-600">
+                                        <IconPencil size={13} />
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
                     <FieldRow
                         label="Sign-in method"
                         value={isOAuth ? "Google (OAuth)" : "Email & Password"}

@@ -114,15 +114,14 @@ export default function SignupPage() {
                     </div>
 
                     <div className="space-y-1.5">
-                        <Label htmlFor="collegeId">
-                            College ID <span className="text-zinc-400 font-normal">(optional)</span>
-                        </Label>
+                        <Label htmlFor="collegeId">USN</Label>
                         <Input
                             id="collegeId"
                             name="collegeId"
-                            placeholder="e.g. 22CS001"
+                            placeholder="e.g. 4VP22CS001"
                             value={form.collegeId}
                             onChange={handleChange}
+                            required
                         />
                     </div>
 

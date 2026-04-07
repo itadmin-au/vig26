@@ -28,6 +28,9 @@ export default withAuth(
         loginUrl.searchParams.set("callbackUrl", pathname);
         return NextResponse.redirect(loginUrl);
       }
+      if (token.needsOnboarding) {
+        return NextResponse.redirect(new URL("/auth/onboarding", req.url));
+      }
     }
 
     return NextResponse.next();

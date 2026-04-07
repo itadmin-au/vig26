@@ -8,6 +8,8 @@ declare module "next-auth" {
             id: string;
             role: UserRole;
             departments: string[];
+            needsOnboarding?: boolean;
+            collegeId?: string | null;
         } & DefaultSession["user"];
     }
 
@@ -23,5 +25,7 @@ declare module "next-auth/jwt" {
         role: UserRole;
         departments: string[];
         lastChecked?: number;
+        needsOnboarding?: boolean;
+        collegeId?: string | null;
     }
 }
