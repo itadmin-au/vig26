@@ -205,13 +205,13 @@ function FormStep({
 function ReviewStep({
     event, leaderName, leaderEmail, members, responses,
     onBack, onSubmit, submitting, paymentError, onRetryPayment,
-    provider, setProvider,
+    provider,
 }: {
     event: IEvent; leaderName: string; leaderEmail: string;
     members: { name: string; email: string }[]; responses: Record<string, string>;
     onBack: () => void; onSubmit: () => void; submitting: boolean;
     paymentError: string | null; onRetryPayment: () => void;
-    provider: "cashfree" | "hdfc"; setProvider: (p: "cashfree" | "hdfc") => void;
+    provider: "cashfree" | "hdfc";
 }) {
     const isPaid = event.price > 0;
 
@@ -274,37 +274,11 @@ function ReviewStep({
                 </div>
             )}
 
-            {/* Provider selector + payment notice */}
+            {/* Payment notice */}
             {isPaid && !paymentError && (
-                <div className="space-y-3">
-                    <div>
-                        <p className="text-sm font-medium text-zinc-700 mb-2">Pay with</p>
-                        <div className="grid grid-cols-2 gap-2">
-                            {(["cashfree", "hdfc"] as const).map((p) => (
-                                <button
-                                    key={p}
-                                    type="button"
-                                    onClick={() => setProvider(p)}
-                                    className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-medium transition-colors ${
-                                        provider === p
-                                            ? "border-primary bg-primary/5 text-primary"
-                                            : "border-zinc-200 text-zinc-500 hover:border-zinc-300"
-                                    }`}
-                                >
-                                    <IconCreditCard size={15} />
-                                    {p === "cashfree" ? "Cashfree (UPI)" : "HDFC SmartGateway"}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                    <div className="flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-xl p-4 text-sm text-blue-700">
-                        <IconCreditCard size={16} className="shrink-0 mt-0.5 text-blue-400" />
-                        {provider === "hdfc" ? (
-                            <span>You&apos;ll be redirected to HDFC SmartGateway to complete payment of <strong>₹{event.price}</strong>. Your ticket is confirmed only after successful payment.</span>
-                        ) : (
-                            <span>You&apos;ll complete payment of <strong>₹{event.price}</strong> securely via UPI. Your ticket is confirmed only after successful payment.</span>
-                        )}
-                    </div>
+                <div className="flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-xl p-4 text-sm text-blue-700">
+                    <IconCreditCard size={16} className="shrink-0 mt-0.5 text-blue-400" />
+                    <span>You&apos;ll be redirected to HDFC SmartGateway to complete payment of <strong>₹{event.price}</strong> via UPI. Your ticket is confirmed only after successful payment.</span>
                 </div>
             )}
 
@@ -398,7 +372,7 @@ export default function RegisterPage() {
     const [ticketCount, setTicketCount] = useState(1);
     const [submitting, setSubmitting] = useState(false);
     const [paymentError, setPaymentError] = useState<string | null>(null);
-    const [provider, setProvider] = useState<"cashfree" | "hdfc">("cashfree");
+    const provider = "hdfc" as const;
 
     const [members, setMembers] = useState<{ name: string; email: string }[]>([]);
     const [responses, setResponses] = useState<Record<string, string>>({});
@@ -598,7 +572,7 @@ export default function RegisterPage() {
                                         onBack={() => { setPaymentError(null); setStep(s => s - 1); }}
                                         onSubmit={handleSubmit} submitting={submitting}
                                         paymentError={paymentError} onRetryPayment={handlePaidSubmit}
-                                        provider={provider} setProvider={setProvider}
+                                        provider={provider}
                                     />
                                 );
                             })()}
