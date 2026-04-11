@@ -10,9 +10,9 @@ import { getEventBySlug } from "@/actions/events";
 import { getUserRegistrationForEvent } from "@/actions/registrations";
 import {
     IconCalendarEvent, IconMapPin, IconUsers, IconCurrencyRupee,
-    IconArrowLeft, IconTicket, IconAlertCircle, IconClock,
+    IconArrowLeft, IconTicket, IconAlertCircle, IconClock, IconLayoutList,
 } from "@tabler/icons-react";
-import type { IEvent } from "@/types";
+import type { IEvent, IEventSlot } from "@/types";
 import "@uiw/react-markdown-preview/markdown.css";
 
 const MDPreview = dynamic(() => import("@uiw/react-markdown-preview"), { ssr: false });
@@ -210,6 +210,57 @@ export default function EventDetailPage() {
                             </div>
                         )}
 
+                        {(event.slots?.length ?? 0) > 0 && (
+                            <div className="bg-white rounded-2xl border border-zinc-200 p-5">
+                                <div className="flex items-center gap-2 mb-4">
+                                    <IconLayoutList size={16} className="text-zinc-400" />
+                                    <h2 className="text-sm font-semibold text-zinc-900">Available Time Slots</h2>
+                                    <span className="text-xs text-zinc-400 bg-zinc-100 px-2 py-0.5 rounded-full ml-auto">
+                                        {event.slots!.length} slot{event.slots!.length !== 1 ? "s" : ""}
+                                    </span>
+                                </div>
+                                <div className="space-y-2.5">
+                                    {event.slots!.map((slot: IEventSlot) => {
+                                        const slotStart = new Date(slot.start);
+                                        const slotEnd = new Date(slot.end);
+                                        const slotFull = slot.capacity > 0 && slot.registrationCount >= slot.capacity;
+                                        const remaining = slot.capacity > 0 ? slot.capacity - slot.registrationCount : null;
+                                        return (
+                                            <div
+                                                key={slot._id.toString()}
+                                                className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border px-4 py-3 ${slotFull ? "border-zinc-200 bg-zinc-50 opacity-60" : "border-zinc-200 bg-white"}`}
+                                            >
+                                                <div className="space-y-0.5">
+                                                    {slot.label && (
+                                                        <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide">{slot.label}</p>
+                                                    )}
+                                                    <p className="text-sm font-medium text-zinc-800">
+                                                        {slotStart.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "long", timeZone: "Asia/Kolkata" })}
+                                                    </p>
+                                                    <p className="text-xs text-zinc-500">
+                                                        {slotStart.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" })}
+                                                        {" – "}
+                                                        {slotEnd.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" })}
+                                                    </p>
+                                                </div>
+                                                <div className="shrink-0">
+                                                    {slotFull ? (
+                                                        <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-red-50 text-red-500">Full</span>
+                                                    ) : remaining !== null ? (
+                                                        <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${remaining <= 10 ? "bg-amber-50 text-amber-600" : "bg-green-50 text-green-600"}`}>
+                                                            {remaining} seat{remaining !== 1 ? "s" : ""} left
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-green-50 text-green-600">Open</span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+
                         {event.rules && (
                             <div className="bg-white rounded-2xl border border-zinc-200 p-5">
                                 <h2 className="text-sm font-semibold text-zinc-900 mb-3">Rules & Guidelines</h2>
@@ -268,18 +319,28 @@ export default function EventDetailPage() {
                                 </div>
                             )}
 
-                            <div className="flex items-start gap-2 text-sm text-zinc-500 bg-zinc-50 rounded-xl px-3 py-2.5">
-                                <IconClock size={15} className="shrink-0 mt-0.5 text-zinc-400" />
-                                <div>
-                                    <p className="font-medium text-zinc-700">
-                                        {start.toLocaleDateString("en-IN", { day: "numeric", month: "long", timeZone: "Asia/Kolkata" })}
-                                    </p>
-                                    <p className="text-xs mt-0.5">
-                                        {start.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" })} –{" "}
-                                        {end.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" })}
-                                    </p>
+                            {(event.slots?.length ?? 0) > 1 ? (
+                                <div className="flex items-start gap-2 text-sm bg-zinc-50 rounded-xl px-3 py-2.5">
+                                    <IconLayoutList size={15} className="shrink-0 mt-0.5 text-zinc-400" />
+                                    <div>
+                                        <p className="font-medium text-zinc-700">{event.slots!.length} time slots available</p>
+                                        <p className="text-xs text-zinc-500 mt-0.5">You'll choose a slot during registration</p>
+                                    </div>
                                 </div>
-                            </div>
+                            ) : (
+                                <div className="flex items-start gap-2 text-sm text-zinc-500 bg-zinc-50 rounded-xl px-3 py-2.5">
+                                    <IconClock size={15} className="shrink-0 mt-0.5 text-zinc-400" />
+                                    <div>
+                                        <p className="font-medium text-zinc-700">
+                                            {start.toLocaleDateString("en-IN", { day: "numeric", month: "long", timeZone: "Asia/Kolkata" })}
+                                        </p>
+                                        <p className="text-xs mt-0.5">
+                                            {start.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" })} –{" "}
+                                            {end.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" })}
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
 
                             {event.isTeamEvent && event.teamSize && (
                                 <div className="flex items-start gap-2 text-sm text-zinc-500 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2.5">

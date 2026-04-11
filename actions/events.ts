@@ -4,7 +4,7 @@
 import { connectDB } from "@/lib/db";
 import { Event, Category, Registration, Ticket } from "@/models";
 import { requireManagement, requireDepartmentAccess, requireSuperAdmin } from "@/lib/auth-helpers";
-import { createEventSchema, updateEventSchema } from "@/lib/validations";
+import { createEventSchema, updateEventSchema, eventSlotSchema } from "@/lib/validations";
 import { serialize, getPaginationParams } from "@/lib/utils";
 import type { EventFilters, PaginatedResponse, IEvent } from "@/types";
 
@@ -96,24 +96,53 @@ export async function createEvent(formData: FormData) {
     // (the client uploads via /api/upload first, then sets this field)
     const coverImage = raw.coverImage as string | undefined;
 
+    // Parse slots first so we can derive dateStart/dateEnd from them if provided
+    const rawSlots: { _id?: string; label?: string; start: string; end: string; capacity: number }[] =
+        raw.slots ? JSON.parse(raw.slots as string) : [];
+    const parsedSlots = rawSlots.map((s) => ({
+        ...s,
+        start: new Date((s.start) + (s.start.length === 16 ? ":00+05:30" : "+05:30")).toISOString(),
+        end: new Date((s.end) + (s.end.length === 16 ? ":00+05:30" : "+05:30")).toISOString(),
+        capacity: Number(s.capacity ?? 0),
+    }));
+
+    // When slots are defined, derive the event-level dates from them
+    let derivedDateStart = raw.dateStart as string | undefined;
+    let derivedDateEnd = raw.dateEnd as string | undefined;
+    if (parsedSlots.length > 0) {
+        const slotStarts = parsedSlots.map((s) => new Date(s.start).getTime());
+        const slotEnds = parsedSlots.map((s) => new Date(s.end).getTime());
+        derivedDateStart = new Date(Math.min(...slotStarts)).toISOString();
+        derivedDateEnd = new Date(Math.max(...slotEnds)).toISOString();
+    }
+
     const parsed = createEventSchema.safeParse({
         ...raw,
         coverImage: coverImage || undefined,
-        dateStart: raw.dateStart ? new Date((raw.dateStart as string) + ":00+05:30").toISOString() : undefined,
-        dateEnd: raw.dateEnd ? new Date((raw.dateEnd as string) + ":00+05:30").toISOString() : undefined,
+        dateStart: derivedDateStart
+            ? (derivedDateStart.includes("+") || derivedDateStart.endsWith("Z")
+                ? derivedDateStart
+                : new Date((derivedDateStart as string) + ":00+05:30").toISOString())
+            : undefined,
+        dateEnd: derivedDateEnd
+            ? (derivedDateEnd.includes("+") || derivedDateEnd.endsWith("Z")
+                ? derivedDateEnd
+                : new Date((derivedDateEnd as string) + ":00+05:30").toISOString())
+            : undefined,
         capacity: Number(raw.capacity ?? 0),
         price: Number(raw.price ?? 0),
         isTeamEvent: raw.isTeamEvent === "true",
         teamSizeMin: raw.teamSizeMin ? Number(raw.teamSizeMin) : undefined,
         teamSizeMax: raw.teamSizeMax ? Number(raw.teamSizeMax) : undefined,
         customForm: raw.customForm ? JSON.parse(raw.customForm as string) : [],
+        slots: parsedSlots,
     });
 
     if (!parsed.success) {
         return { success: false, error: parsed.error.issues[0].message };
     }
 
-    const { departmentId, dateStart, dateEnd, teamSizeMin, teamSizeMax, ...rest } = parsed.data;
+    const { departmentId, dateStart, dateEnd, teamSizeMin, teamSizeMax, slots, ...rest } = parsed.data;
 
     await requireDepartmentAccess(departmentId);
 
@@ -125,6 +154,13 @@ export async function createEvent(formData: FormData) {
         ...(parsed.data.isTeamEvent && teamSizeMin && teamSizeMax
             ? { teamSize: { min: teamSizeMin, max: teamSizeMax } }
             : {}),
+        slots: slots.map((s) => ({
+            label: s.label || undefined,
+            start: new Date(s.start),
+            end: new Date(s.end),
+            capacity: s.capacity,
+            registrationCount: 0,
+        })),
     });
 
     return { success: true, data: serialize(event) };
@@ -143,24 +179,51 @@ export async function updateEvent(id: string, formData: FormData) {
     // coverImage is now a Cloudinary URL string or empty string (meaning "remove")
     const coverImage = raw.coverImage as string | undefined;
 
+    // Parse slots with IST conversion
+    const rawSlotsUpdate: { _id?: string; label?: string; start: string; end: string; capacity: number; registrationCount?: number }[] =
+        raw.slots ? JSON.parse(raw.slots as string) : [];
+    const parsedSlotsUpdate = rawSlotsUpdate.map((s) => ({
+        ...s,
+        start: new Date((s.start) + (s.start.length === 16 ? ":00+05:30" : "+05:30")).toISOString(),
+        end: new Date((s.end) + (s.end.length === 16 ? ":00+05:30" : "+05:30")).toISOString(),
+        capacity: Number(s.capacity ?? 0),
+    }));
+
+    // When slots defined, derive event-level dates from them
+    let derivedDateStartUpdate = raw.dateStart as string | undefined;
+    let derivedDateEndUpdate = raw.dateEnd as string | undefined;
+    if (parsedSlotsUpdate.length > 0) {
+        const slotStarts = parsedSlotsUpdate.map((s) => new Date(s.start).getTime());
+        const slotEnds = parsedSlotsUpdate.map((s) => new Date(s.end).getTime());
+        derivedDateStartUpdate = new Date(Math.min(...slotStarts)).toISOString();
+        derivedDateEndUpdate = new Date(Math.max(...slotEnds)).toISOString();
+    }
+
+    const toISO = (v: string | undefined) => {
+        if (!v) return undefined;
+        if (v.includes("+") || v.endsWith("Z")) return v;
+        return new Date(v + ":00+05:30").toISOString();
+    };
+
     const parsed = updateEventSchema.safeParse({
         ...raw,
         coverImage: coverImage || undefined,
-        dateStart: raw.dateStart ? new Date((raw.dateStart as string) + ":00+05:30").toISOString() : undefined,
-        dateEnd: raw.dateEnd ? new Date((raw.dateEnd as string) + ":00+05:30").toISOString() : undefined,
+        dateStart: toISO(derivedDateStartUpdate),
+        dateEnd: toISO(derivedDateEndUpdate),
         capacity: raw.capacity !== undefined ? Number(raw.capacity) : undefined,
         price: raw.price !== undefined ? Number(raw.price) : undefined,
         isTeamEvent: raw.isTeamEvent !== undefined ? raw.isTeamEvent === "true" : undefined,
         teamSizeMin: raw.teamSizeMin ? Number(raw.teamSizeMin) : undefined,
         teamSizeMax: raw.teamSizeMax ? Number(raw.teamSizeMax) : undefined,
         customForm: raw.customForm ? JSON.parse(raw.customForm as string) : undefined,
+        slots: raw.slots !== undefined ? parsedSlotsUpdate : undefined,
     });
 
     if (!parsed.success) {
         return { success: false, error: parsed.error.issues[0].message };
     }
 
-    const { departmentId, dateStart, dateEnd, teamSizeMin, teamSizeMax, ...rest } = parsed.data;
+    const { departmentId, dateStart, dateEnd, teamSizeMin, teamSizeMax, slots: parsedSlots2, ...rest } = parsed.data;
 
     const updates: Record<string, unknown> = { ...rest };
 
@@ -178,6 +241,27 @@ export async function updateEvent(id: string, formData: FormData) {
     }
     if (parsed.data.isTeamEvent && teamSizeMin && teamSizeMax) {
         updates.teamSize = { min: teamSizeMin, max: teamSizeMax };
+    }
+
+    // Slots — always replace when the key is present in the request
+    if (raw.slots !== undefined && parsedSlotsUpdate.length >= 0) {
+        // Only treat _id as a real MongoDB ObjectId if it's a valid 24-char hex string.
+        // Client-generated short IDs (e.g. 'yutate8dm4') must be omitted so Mongoose
+        // auto-assigns a proper ObjectId for new slots.
+        const isValidObjectId = (id: string) => /^[0-9a-f]{24}$/i.test(id);
+        const existingSlots: any[] = (event.slots as any) ?? [];
+        updates.slots = parsedSlotsUpdate.map((s) => {
+            const validId = s._id && isValidObjectId(s._id) ? s._id : null;
+            const existing = validId ? existingSlots.find((e: any) => e._id?.toString() === validId) : null;
+            return {
+                ...(validId ? { _id: validId } : {}),
+                label: s.label || undefined,
+                start: new Date(s.start),
+                end: new Date(s.end),
+                capacity: s.capacity,
+                registrationCount: existing?.registrationCount ?? 0,
+            };
+        });
     }
 
     // Google Sheet ID — stored directly, not part of the zod schema

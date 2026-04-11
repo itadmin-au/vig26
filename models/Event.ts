@@ -4,6 +4,18 @@ import { slugify } from "@/lib/utils";
 
 export interface IEventDocument extends Omit<IEvent, "_id">, Document {}
 
+// ─── Slot Sub-schema ─────────────────────────────────────────────────────────
+const SlotSchema = new Schema(
+  {
+    label: { type: String, default: null, trim: true },
+    start: { type: Date, required: true },
+    end: { type: Date, required: true },
+    capacity: { type: Number, default: 0, min: 0 }, // 0 = unlimited
+    registrationCount: { type: Number, default: 0, min: 0 },
+  },
+  { _id: true }
+);
+
 // ─── FormField Sub-schema ────────────────────────────────────────────────────
 const FormFieldSchema = new Schema(
   {
@@ -121,6 +133,10 @@ const EventSchema = new Schema<IEventDocument>(
     csvToken: {
       type: String,
       default: null,
+    },
+    slots: {
+      type: [SlotSchema],
+      default: [],
     },
   },
   {

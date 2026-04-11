@@ -17,7 +17,7 @@ import {
     IconTicket, IconLoader2, IconPlus, IconTrash, IconAlertCircle,
     IconCreditCard, IconRefresh,
 } from "@tabler/icons-react";
-import type { IEvent, IFormResponse } from "@/types";
+import type { IEvent, IFormResponse, IEventSlot } from "@/types";
 
 // ─── Load Cashfree SDK ─────────────────────────────────────────────────────────
 
@@ -56,6 +56,96 @@ function Steps({ current, steps }: { current: number; steps: string[] }) {
                     )}
                 </div>
             ))}
+        </div>
+    );
+}
+
+// ─── Step 0 (optional): Slot selection ────────────────────────────────────────
+
+function SlotStep({
+    slots, selectedSlotId, onSelect, onNext,
+}: {
+    slots: IEventSlot[];
+    selectedSlotId: string;
+    onSelect: (id: string) => void;
+    onNext: () => void;
+}) {
+    function formatSlotDate(start: Date, end: Date) {
+        const opts: Intl.DateTimeFormatOptions = { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" };
+        const s = new Date(start).toLocaleDateString("en-IN", opts);
+        const e = new Date(end).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+        return `${s} – ${e}`;
+    }
+
+    function getAvailability(slot: IEventSlot) {
+        if (slot.capacity === 0) return { label: "Unlimited", full: false };
+        const remaining = Math.max(0, slot.capacity - slot.registrationCount);
+        if (remaining === 0) return { label: "Full", full: true };
+        return { label: `${remaining} seat${remaining !== 1 ? "s" : ""} left`, full: false };
+    }
+
+    return (
+        <div className="space-y-5">
+            <div>
+                <h2 className="text-lg font-semibold text-zinc-900">Choose a Time Slot</h2>
+                <p className="text-sm text-zinc-500 mt-1">Select the date and time you'd like to attend.</p>
+            </div>
+            <div className="space-y-3">
+                {slots.map((slot) => {
+                    const { label: availLabel, full } = getAvailability(slot);
+                    const isSelected = selectedSlotId === slot._id;
+                    return (
+                        <button
+                            key={slot._id}
+                            type="button"
+                            disabled={full}
+                            onClick={() => onSelect(slot._id)}
+                            className={[
+                                "w-full text-left p-4 rounded-xl border-2 transition-all duration-150",
+                                full
+                                    ? "border-zinc-100 bg-zinc-50 opacity-50 cursor-not-allowed"
+                                    : isSelected
+                                    ? "border-orange-500 bg-orange-50"
+                                    : "border-zinc-200 bg-white hover:border-zinc-300",
+                            ].join(" ")}
+                        >
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="flex-1">
+                                    {slot.label && (
+                                        <p className="text-sm font-semibold text-zinc-900 mb-0.5">{slot.label}</p>
+                                    )}
+                                    <p className={`text-sm ${slot.label ? "text-zinc-500" : "font-medium text-zinc-900"}`}>
+                                        {formatSlotDate(slot.start, slot.end)}
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                                        full ? "bg-red-100 text-red-600" : "bg-green-100 text-green-700"
+                                    }`}>
+                                        {availLabel}
+                                    </span>
+                                    {isSelected && !full && (
+                                        <div className="w-4 h-4 rounded-full bg-orange-500 flex items-center justify-center">
+                                            <IconCheck size={10} className="text-white" />
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </button>
+                    );
+                })}
+            </div>
+            <div className="flex justify-end pt-1">
+                <Button
+                    onClick={() => {
+                        if (!selectedSlotId) { toast.error("Please select a time slot."); return; }
+                        onNext();
+                    }}
+                    className="bg-primary hover:bg-primary/80 text-primary-foreground"
+                >
+                    Continue <IconArrowRight size={15} className="ml-1.5" />
+                </Button>
+            </div>
         </div>
     );
 }
@@ -204,11 +294,12 @@ function FormStep({
 
 function ReviewStep({
     event, leaderName, leaderEmail, members, responses,
-    onBack, onSubmit, submitting, paymentError, onRetryPayment,
+    selectedSlot, onBack, onSubmit, submitting, paymentError, onRetryPayment,
     provider,
 }: {
     event: IEvent; leaderName: string; leaderEmail: string;
     members: { name: string; email: string }[]; responses: Record<string, string>;
+    selectedSlot?: IEventSlot;
     onBack: () => void; onSubmit: () => void; submitting: boolean;
     paymentError: string | null; onRetryPayment: () => void;
     provider: "cashfree" | "hdfc";
@@ -226,9 +317,14 @@ function ReviewStep({
             <div className="bg-zinc-50 border border-zinc-200 rounded-xl p-4 space-y-2">
                 <h3 className="text-sm font-semibold text-zinc-900">{event.title}</h3>
                 <p className="text-xs text-zinc-400">
-                    {new Date(event.date.start).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "long", year: "numeric" })}
+                    {selectedSlot
+                        ? new Date(selectedSlot.start).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })
+                        : new Date(event.date.start).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "long", year: "numeric" })}
                     {event.venue && ` · ${event.venue}`}
                 </p>
+                {selectedSlot?.label && (
+                    <p className="text-xs text-orange-600 font-medium">{selectedSlot.label}</p>
+                )}
                 <div className="flex items-center justify-between pt-2 border-t border-zinc-200">
                     <span className="text-sm text-zinc-600">Entry fee</span>
                     <span className="text-sm font-semibold">
@@ -377,6 +473,7 @@ export default function RegisterPage() {
     const [members, setMembers] = useState<{ name: string; email: string }[]>([]);
     const [responses, setResponses] = useState<Record<string, string>>({});
     const [leaderName, setLeaderName] = useState("");
+    const [selectedSlotId, setSelectedSlotId] = useState("");
 
     // Pre-load Cashfree SDK for paid events
     useEffect(() => {
@@ -400,6 +497,7 @@ export default function RegisterPage() {
     }, [slug, status]);
 
     const steps: string[] = [];
+    if ((event?.slots?.length ?? 0) > 0) steps.push("Slot");
     if (event?.isTeamEvent) steps.push("Team");
     if ((event?.customForm?.length ?? 0) > 0) steps.push("Details");
     steps.push("Confirm");
@@ -413,6 +511,7 @@ export default function RegisterPage() {
         setSubmitting(true);
         const result = await createRegistration({
             eventId: event._id.toString(),
+            slotId: selectedSlotId || undefined,
             teamMembers: event.isTeamEvent ? members : [],
             formResponses: buildFormResponses(),
         });
@@ -449,6 +548,7 @@ export default function RegisterPage() {
             sessionStorage.setItem("hdfc_pending", JSON.stringify({
                 eventId: event._id.toString(),
                 eventTitle: event.title,
+                slotId: selectedSlotId || undefined,
                 teamMembers: teamMembersPayload,
                 formResponses,
             }));
@@ -495,6 +595,7 @@ export default function RegisterPage() {
                         orderId: orderData.orderId,
                         provider: "cashfree",
                         eventId: event._id.toString(),
+                        slotId: selectedSlotId || undefined,
                         teamMembers: teamMembersPayload,
                         formResponses,
                     }),
@@ -552,8 +653,19 @@ export default function RegisterPage() {
                             {steps.length > 1 && <Steps current={step} steps={steps} />}
                             {(() => {
                                 let idx = 0;
+                                const hasSlots = (event.slots?.length ?? 0) > 0;
                                 const isTeam = event.isTeamEvent;
                                 const hasForm = (event.customForm?.length ?? 0) > 0;
+
+                                if (hasSlots && step === idx) return (
+                                    <SlotStep
+                                        slots={event.slots ?? []}
+                                        selectedSlotId={selectedSlotId}
+                                        onSelect={setSelectedSlotId}
+                                        onNext={() => setStep(s => s + 1)}
+                                    />
+                                );
+                                if (hasSlots) idx++;
 
                                 if (isTeam && step === idx) return (
                                     <TeamStep event={event} leaderName={leaderName} setLeaderName={setLeaderName} leaderEmail={session?.user?.email ?? ""} members={members} setMembers={setMembers} onNext={() => setStep(s => s + 1)} />
@@ -565,10 +677,12 @@ export default function RegisterPage() {
                                 );
                                 if (hasForm) idx++;
 
+                                const chosenSlot = event.slots?.find((s) => s._id === selectedSlotId);
                                 return (
                                     <ReviewStep
                                         event={event} leaderName={leaderName} leaderEmail={session?.user?.email ?? ""}
                                         members={members} responses={responses}
+                                        selectedSlot={chosenSlot}
                                         onBack={() => { setPaymentError(null); setStep(s => s - 1); }}
                                         onSubmit={handleSubmit} submitting={submitting}
                                         paymentError={paymentError} onRetryPayment={handlePaidSubmit}

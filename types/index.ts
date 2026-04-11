@@ -47,6 +47,16 @@ export interface IEventDate {
     end: Date;
 }
 
+export interface IEventSlot {
+    _id: string;
+    label?: string;
+    start: Date;
+    end: Date;
+    /** 0 = unlimited */
+    capacity: number;
+    registrationCount: number;
+}
+
 export interface IDepartmentMember {
     userId: Types.ObjectId | string;
     role: "dept_admin" | "coordinator";
@@ -147,6 +157,8 @@ export interface IEvent {
     googleSheetId?: string;
     /** Secret token for the public CSV feed URL */
     csvToken?: string;
+    /** Optional time slots; when present, registrations must pick a slot */
+    slots?: IEventSlot[];
     createdAt: Date;
     updatedAt: Date;
 }
@@ -163,6 +175,8 @@ export interface IRegistration {
     teamMembers: ITeamMember[];
     /** Shared UUID across all tickets for this registration */
     teamId?: string;
+    /** The slot chosen during registration (only when event has slots) */
+    slotId?: string;
     paymentId?: string;
     paymentStatus: PaymentStatus;
     status: RegistrationStatus;

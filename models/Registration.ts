@@ -41,6 +41,10 @@ const RegistrationSchema = new Schema<IRegistrationDocument>(
             default: null,
             index: true,
         },
+        slotId: {
+            type: Schema.Types.ObjectId,
+            default: null,
+        },
         paymentId: {
             type: String,
             default: null,
@@ -67,13 +71,20 @@ RegistrationSchema.index({ eventId: 1, userId: 1 }, { unique: true });
 // ─── Unique index: one registration per paymentId (prevents race-condition duplicates) ──
 RegistrationSchema.index({ paymentId: 1 }, { unique: true, sparse: true });
 
-// ─── Post-save: increment event's registrationCount ──────────────────────────
+// ─── Post-save: increment event's registrationCount (and slot if applicable) ─
 RegistrationSchema.post("save", async function () {
     if (this.status === "confirmed") {
         const Event = mongoose.model("Event");
         await Event.findByIdAndUpdate(this.eventId, {
             $inc: { registrationCount: 1 },
         });
+        if (this.slotId) {
+            await Event.findByIdAndUpdate(
+                this.eventId,
+                { $inc: { "slots.$[slot].registrationCount": 1 } },
+                { arrayFilters: [{ "slot._id": this.slotId }] }
+            );
+        }
     }
 });
 
@@ -84,6 +95,13 @@ RegistrationSchema.post("findOneAndUpdate", async function (doc) {
         await Event.findByIdAndUpdate(doc.eventId, {
             $inc: { registrationCount: -1 },
         });
+        if (doc.slotId) {
+            await Event.findByIdAndUpdate(
+                doc.eventId,
+                { $inc: { "slots.$[slot].registrationCount": -1 } },
+                { arrayFilters: [{ "slot._id": doc.slotId }] }
+            );
+        }
     }
 });
 

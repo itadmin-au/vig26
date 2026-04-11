@@ -16,11 +16,76 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ImageUpload } from "@/components/manage/image-upload";
-import type { IFormField, FormFieldType, IEvent } from "@/types";
+import type { IFormField, FormFieldType, IEvent, IEventSlot } from "@/types";
 import "@uiw/react-md-editor/markdown-editor.css";
 import "@uiw/react-markdown-preview/markdown.css";
 
 const MDEditor = dynamic(() => import("@uiw/react-md-editor"), { ssr: false });
+
+// ─── Slot row ─────────────────────────────────────────────────────────────────
+function SlotRow({
+    slot, index, onUpdate, onRemove,
+}: {
+    slot: Omit<IEventSlot, "registrationCount">;
+    index: number;
+    onUpdate: (i: number, u: Partial<Omit<IEventSlot, "registrationCount">>) => void;
+    onRemove: (i: number) => void;
+}) {
+    return (
+        <div className="bg-zinc-50 border border-zinc-200 rounded-xl p-4 space-y-3">
+            <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wide">Slot {index + 1}</span>
+                <button
+                    type="button"
+                    onClick={() => onRemove(index)}
+                    className="p-1.5 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                >
+                    <IconTrash size={15} />
+                </button>
+            </div>
+            <div>
+                <Label className="text-xs mb-1">Label <span className="text-zinc-400">(optional)</span></Label>
+                <Input
+                    value={slot.label ?? ""}
+                    onChange={(e) => onUpdate(index, { label: e.target.value })}
+                    placeholder="e.g. Morning Session"
+                    className="h-8 text-sm"
+                />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+                <div>
+                    <Label className="text-xs mb-1">Start <span className="text-red-500">*</span></Label>
+                    <Input
+                        type="datetime-local"
+                        value={slot.start as unknown as string}
+                        onChange={(e) => onUpdate(index, { start: e.target.value as unknown as Date })}
+                        className="h-8 text-sm"
+                    />
+                </div>
+                <div>
+                    <Label className="text-xs mb-1">End <span className="text-red-500">*</span></Label>
+                    <Input
+                        type="datetime-local"
+                        value={slot.end as unknown as string}
+                        onChange={(e) => onUpdate(index, { end: e.target.value as unknown as Date })}
+                        className="h-8 text-sm"
+                    />
+                </div>
+            </div>
+            <div>
+                <Label className="text-xs mb-1">Capacity (seats)</Label>
+                <Input
+                    type="number"
+                    min="0"
+                    value={slot.capacity}
+                    onChange={(e) => onUpdate(index, { capacity: Number(e.target.value) })}
+                    className="h-8 text-sm"
+                />
+                <p className="text-xs text-zinc-400 mt-1">0 = unlimited for this slot.</p>
+            </div>
+        </div>
+    );
+}
 
 const FIELD_TYPES: { value: FormFieldType; label: string }[] = [
     { value: "short_text", label: "Short Text" },
@@ -172,12 +237,14 @@ export default function EditEventPage() {
     const [description, setDescription] = useState("");
     const [rules, setRules] = useState("");
     const [formFields, setFormFields] = useState<IFormField[]>([]);
+    const [useSlots, setUseSlots] = useState(false);
+    const [slots, setSlots] = useState<Omit<IEventSlot, "registrationCount">[]>([]);
     const [isTeamEvent, setIsTeamEvent] = useState(false);
     const [teamSizeMin, setTeamSizeMin] = useState(2);
     const [teamSizeMax, setTeamSizeMax] = useState(5);
     const [googleSheetId, setGoogleSheetId] = useState("");
     const [expanded, setExpanded] = useState({
-        basic: true, details: true, rules: false, team: false, form: false,
+        basic: true, details: true, rules: false, team: false, form: false, slots: false,
     });
 
     useEffect(() => {
@@ -205,6 +272,18 @@ export default function EditEventPage() {
                         ? found.department
                         : (found.department as any)?._id ?? ""
                 );
+                // Load existing slots
+                const existingSlots = (found.slots ?? []) as IEventSlot[];
+                if (existingSlots.length > 0) {
+                    setUseSlots(true);
+                    setSlots(existingSlots.map((s) => ({
+                        _id: s._id,
+                        label: s.label,
+                        start: toDatetimeLocal(s.start) as unknown as Date,
+                        end: toDatetimeLocal(s.end) as unknown as Date,
+                        capacity: s.capacity,
+                    })));
+                }
             }
 
             setCategories((cats as any[]).map((c) => c.slug));
@@ -241,6 +320,21 @@ export default function EditEventPage() {
         setFormFields((prev) => prev.filter((_, idx) => idx !== i));
     }, []);
 
+    const addSlot = useCallback(() => {
+        setSlots((prev) => [
+            ...prev,
+            { _id: Math.random().toString(36).slice(2), label: "", start: "" as unknown as Date, end: "" as unknown as Date, capacity: 0 },
+        ]);
+    }, []);
+
+    const updateSlot = useCallback((index: number, updates: Partial<Omit<IEventSlot, "registrationCount">>) => {
+        setSlots((prev) => prev.map((s, i) => (i === index ? { ...s, ...updates } : s)));
+    }, []);
+
+    const removeSlot = useCallback((index: number) => {
+        setSlots((prev) => prev.filter((_, i) => i !== index));
+    }, []);
+
     async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
         e.preventDefault();
         setSaving(true);
@@ -251,6 +345,7 @@ export default function EditEventPage() {
         formData.set("rules", rules);
         formData.set("departmentId", selectedDeptId);
         formData.set("customForm", JSON.stringify(formFields.map((f, i) => ({ ...f, order: i }))));
+        formData.set("slots", useSlots ? JSON.stringify(slots) : "[]");
         formData.set("googleSheetId", googleSheetId.trim());
 
         // Pass current Cloudinary URL (or empty string to signal removal)
@@ -420,28 +515,37 @@ export default function EditEventPage() {
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <Label htmlFor="dateStart">Start Date & Time</Label>
-                                    <Input
-                                        id="dateStart"
-                                        name="dateStart"
-                                        type="datetime-local"
-                                        defaultValue={toDatetimeLocal(event.date?.start)}
-                                        className="mt-1"
-                                    />
+                            {useSlots ? (
+                                <div className="bg-orange-50 border border-orange-100 rounded-lg px-4 py-3">
+                                    <p className="text-xs text-orange-700">
+                                        Dates and capacity are managed per slot in the <strong>Time Slots</strong> section above.
+                                        The event date will be auto-set to the range of your slots.
+                                    </p>
                                 </div>
-                                <div>
-                                    <Label htmlFor="dateEnd">End Date & Time</Label>
-                                    <Input
-                                        id="dateEnd"
-                                        name="dateEnd"
-                                        type="datetime-local"
-                                        defaultValue={toDatetimeLocal(event.date?.end)}
-                                        className="mt-1"
-                                    />
+                            ) : (
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <Label htmlFor="dateStart">Start Date & Time</Label>
+                                        <Input
+                                            id="dateStart"
+                                            name="dateStart"
+                                            type="datetime-local"
+                                            defaultValue={toDatetimeLocal(event.date?.start)}
+                                            className="mt-1"
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label htmlFor="dateEnd">End Date & Time</Label>
+                                        <Input
+                                            id="dateEnd"
+                                            name="dateEnd"
+                                            type="datetime-local"
+                                            defaultValue={toDatetimeLocal(event.date?.end)}
+                                            className="mt-1"
+                                        />
+                                    </div>
                                 </div>
-                            </div>
+                            )}
 
                             <div>
                                 <Label htmlFor="venue">Venue</Label>
@@ -455,18 +559,20 @@ export default function EditEventPage() {
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <Label htmlFor="capacity">Capacity</Label>
-                                    <Input
-                                        id="capacity"
-                                        name="capacity"
-                                        type="number"
-                                        min="0"
-                                        defaultValue={event.capacity ?? 0}
-                                        className="mt-1"
-                                    />
-                                    <p className="text-xs text-zinc-400 mt-1">0 = unlimited.</p>
-                                </div>
+                                {!useSlots && (
+                                    <div>
+                                        <Label htmlFor="capacity">Capacity</Label>
+                                        <Input
+                                            id="capacity"
+                                            name="capacity"
+                                            type="number"
+                                            min="0"
+                                            defaultValue={event.capacity ?? 0}
+                                            className="mt-1"
+                                        />
+                                        <p className="text-xs text-zinc-400 mt-1">0 = unlimited.</p>
+                                    </div>
+                                )}
                                 <div>
                                     <Label htmlFor="price">Price (₹)</Label>
                                     <Input
@@ -480,6 +586,51 @@ export default function EditEventPage() {
                                     <p className="text-xs text-zinc-400 mt-1">0 = free event.</p>
                                 </div>
                             </div>
+                        </div>
+                    )}
+                </div>
+
+                <div className="bg-white rounded-xl border border-zinc-200 px-5">
+                    <SectionHeader title="Time Slots" sectionKey="slots" />
+                    {expanded.slots && (
+                        <div className="pb-5 space-y-4">
+                            <label className="flex items-center gap-3 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={useSlots}
+                                    onChange={(e) => {
+                                        setUseSlots(e.target.checked);
+                                        if (e.target.checked && slots.length === 0) addSlot();
+                                    }}
+                                    className="w-4 h-4 accent-orange-500"
+                                />
+                                <div>
+                                    <p className="text-sm font-medium text-zinc-900">Enable multiple time slots</p>
+                                    <p className="text-xs text-zinc-400">Participants will choose a slot when registering. Each slot has its own capacity.</p>
+                                </div>
+                            </label>
+
+                            {useSlots && (
+                                <div className="space-y-3">
+                                    {slots.map((slot, i) => (
+                                        <SlotRow
+                                            key={slot._id}
+                                            slot={slot}
+                                            index={i}
+                                            onUpdate={updateSlot}
+                                            onRemove={removeSlot}
+                                        />
+                                    ))}
+                                    <button
+                                        type="button"
+                                        onClick={addSlot}
+                                        className="flex items-center gap-2 w-full justify-center py-2.5 border-2 border-dashed border-zinc-200 rounded-xl text-sm text-zinc-500 hover:border-orange-300 hover:text-orange-600 transition-colors"
+                                    >
+                                        <IconPlus size={16} />
+                                        Add Slot
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>

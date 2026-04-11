@@ -19,15 +19,28 @@ export async function createRegistration(input: unknown) {
         return { success: false, error: parsed.error.issues[0].message };
     }
 
-    const { eventId, teamMembers, formResponses } = parsed.data;
+    const { eventId, slotId, teamMembers, formResponses } = parsed.data;
 
     const event = await Event.findById(eventId);
     if (!event) return { success: false, error: "Event not found." };
     if (event.status !== "published") return { success: false, error: "This event is not open for registration." };
     if (event.registrationsClosed) return { success: false, error: "Registrations for this event are closed." };
 
-    if (event.capacity > 0 && event.registrationCount >= event.capacity) {
-        return { success: false, error: "This event is fully booked." };
+    // ── Slot validation ───────────────────────────────────────────────────────
+    const hasSlots = (event.slots as any[]).length > 0;
+    let chosenSlot: any = null;
+    if (hasSlots) {
+        if (!slotId) return { success: false, error: "Please select a time slot to register." };
+        chosenSlot = (event.slots as any[]).find((s: any) => s._id.toString() === slotId);
+        if (!chosenSlot) return { success: false, error: "The selected slot is not valid." };
+        if (chosenSlot.capacity > 0 && chosenSlot.registrationCount >= chosenSlot.capacity) {
+            return { success: false, error: "This time slot is fully booked. Please choose another slot." };
+        }
+    } else {
+        // Use event-level capacity when no slots
+        if (event.capacity > 0 && event.registrationCount >= event.capacity) {
+            return { success: false, error: "This event is fully booked." };
+        }
     }
 
     const existingReg = await Registration.findOne({ eventId, userId: session.user.id });
@@ -43,6 +56,7 @@ export async function createRegistration(input: unknown) {
         isTeamRegistration: isTeam,
         teamMembers: isTeam ? teamMembers : [],
         teamId,
+        slotId: slotId ?? undefined,
         paymentStatus: event.price === 0 ? "na" : "pending",
         status: event.price === 0 ? "confirmed" : "pending",
     });
@@ -66,11 +80,14 @@ export async function createRegistration(input: unknown) {
     const leaderUser = await User.findById(session.user.id);
     if (leaderUser) {
         try {
+            const emailDate = chosenSlot
+                ? formatEventDate(chosenSlot.start, chosenSlot.end)
+                : formatEventDate(event.date.start, event.date.end);
             await sendTicketConfirmationEmail({
                 to: leaderUser.email,
                 name: leaderUser.name,
                 eventTitle: event.title,
-                eventDate: formatEventDate(event.date.start, event.date.end),
+                eventDate: emailDate,
                 venue: event.venue ?? undefined,
                 ticketId: leaderQR,
             });
@@ -102,11 +119,14 @@ export async function createRegistration(input: unknown) {
 
             if (memberUser) {
                 try {
+                    const memberEmailDate = chosenSlot
+                        ? formatEventDate(chosenSlot.start, chosenSlot.end)
+                        : formatEventDate(event.date.start, event.date.end);
                     await sendTicketConfirmationEmail({
                         to: memberUser.email,
                         name: memberUser.name,
                         eventTitle: event.title,
-                        eventDate: formatEventDate(event.date.start, event.date.end),
+                        eventDate: memberEmailDate,
                         venue: event.venue ?? undefined,
                         ticketId: memberQR,
                     });
