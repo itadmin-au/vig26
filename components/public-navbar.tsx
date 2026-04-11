@@ -91,7 +91,7 @@ export function PublicNavbar() {
                         alt="Vigyanrang"
                         height={40}
                         width={200}
-                        style={{ height: "40px", width: "auto" }}
+                        style={{ height: "40px", width: "auto", filter: isDark ? "none" : "brightness(0)" }}
                     />
                 </Link>
 
