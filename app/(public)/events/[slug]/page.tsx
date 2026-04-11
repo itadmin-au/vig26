@@ -180,11 +180,11 @@ export default function EventDetailPage() {
                             <div className="flex items-center gap-2 text-sm text-zinc-600">
                                 <IconCalendarEvent size={16} className="text-zinc-400" />
                                 <span>
-                                    {start.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "long", year: "numeric" })}
+                                    {start.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" })}
                                     {" · "}
-                                    {start.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+                                    {start.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" })}
                                     {" – "}
-                                    {end.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+                                    {end.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" })}
                                 </span>
                             </div>
                             {event.venue && (
@@ -272,11 +272,11 @@ export default function EventDetailPage() {
                                 <IconClock size={15} className="shrink-0 mt-0.5 text-zinc-400" />
                                 <div>
                                     <p className="font-medium text-zinc-700">
-                                        {start.toLocaleDateString("en-IN", { day: "numeric", month: "long" })}
+                                        {start.toLocaleDateString("en-IN", { day: "numeric", month: "long", timeZone: "Asia/Kolkata" })}
                                     </p>
                                     <p className="text-xs mt-0.5">
-                                        {start.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })} –{" "}
-                                        {end.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+                                        {start.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" })} –{" "}
+                                        {end.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" })}
                                     </p>
                                 </div>
                             </div>

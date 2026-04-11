@@ -290,7 +290,7 @@ export default function EditEventPage() {
     }
 
     const toDatetimeLocal = (d: any) =>
-        d ? new Date(d).toISOString().slice(0, 16) : "";
+        d ? new Date(d).toLocaleString("sv-SE", { timeZone: "Asia/Kolkata" }).replace(" ", "T").slice(0, 16) : "";
 
     if (loading) {
         return (
