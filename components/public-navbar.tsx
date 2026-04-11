@@ -25,6 +25,73 @@ const SOCIAL_LINKS = [
     { label: "LinkedIn ↗", href: "https://www.linkedin.com/school/atria-institute-of-technology/" },
 ];
 
+type ContactPerson = {
+    name: string;
+    role?: string;
+    phone: string;
+};
+
+type ContactEntry = {
+    category: string;
+    people: ContactPerson[];
+};
+
+type ContactSection = {
+    title: string;
+    entries: ContactEntry[];
+};
+
+const CONTACT_SECTIONS: ContactSection[] = [
+    {
+        title: "Faculty Coordinators",
+        entries: [
+            {
+                category: "Technocultural Events",
+                people: [
+                    { name: "Dr. Sampada H K", role: "Assoc. Dean - Student Welfare", phone: "+91 99169 58940" },
+                    { name: "Dr. Devi Kannan", role: "Prof. & HoD, Dept. of CSE", phone: "+91 94602 79588" },
+                ],
+            },
+            {
+                category: "Cultural Events",
+                people: [
+                    { name: "Dr. Archana R. Motta", role: "CCA Coordinator", phone: "+91 94489 36454" },
+                    { name: "Mr. Bhaskar M K", role: "CCA Coordinator", phone: "+91 97415 94742" },
+                ],
+            },
+            {
+                category: "Sponsorship & Project Expo",
+                people: [
+                    { name: "Dr. Deepak N R", role: "Prof. & HoD, Dept. of ISE", phone: "+91 98864 67667" },
+                ],
+            },
+            {
+                category: "Hackathon",
+                people: [
+                    { name: "Ms. Keerthi K S", role: "Asst. Prof. Dept. of CSE", phone: "+91 97391 02765" },
+                ],
+            },
+        ],
+    },
+    {
+        title: "Student Coordinators",
+        entries: [
+            {
+                category: "Hackathon & Technocultural Events",
+                people: [
+                    { name: "Sulaiman Shariff", phone: "+91 87923 45338" },
+                ],
+            },
+            {
+                category: "Cultural Events",
+                people: [
+                    { name: "Darshan", phone: "+91 63663 22531" },
+                ],
+            },
+        ],
+    },
+];
+
 export function PublicNavbar() {
     const { data: session } = useSession();
     const container = useRef<HTMLDivElement>(null);
@@ -70,6 +137,8 @@ export function PublicNavbar() {
 
     const visibleLinks = NAV_LINKS.filter((l) => !l.authRequired || !!session);
     const signOutIndex = String(visibleLinks.length + (isManagement ? 2 : 1)).padStart(2, "0");
+    const facultyContacts = CONTACT_SECTIONS.find((section) => section.title === "Faculty Coordinators");
+    const studentContacts = CONTACT_SECTIONS.find((section) => section.title === "Student Coordinators");
 
     return (
         <div ref={container} className="relative z-100">
@@ -196,7 +265,7 @@ export function PublicNavbar() {
                     </button>
                 </div>
 
-                <div className="flex-1 flex flex-col justify-between px-7 py-6 overflow-hidden">
+                <div className="flex-1 flex flex-col justify-between px-7 py-6 overflow-y-auto overflow-x-hidden gap-8">
                     <nav className="flex flex-col">
                         {visibleLinks.map((link) => (
                             <div
@@ -289,51 +358,91 @@ export function PublicNavbar() {
                     </nav>
 
                     {/* Footer meta */}
-                    <div className="vr-overlay-meta flex gap-8 pt-6 border-t border-white/6 flex-wrap">
-                        <div className="flex flex-col gap-1 flex-1 min-w-32.5">
-                            <p className="text-[0.6rem] font-medium tracking-[0.12em] uppercase text-white/40 mb-1">
+                    <div className="vr-overlay-meta flex gap-8 pt-6 border-t border-white/6 flex-wrap lg:flex-nowrap">
+                        <div className="flex flex-col gap-4 flex-1 min-w-44">
+                            <div className="space-y-0.5">
+                                <p className="text-[0.76rem] text-white/80 normal-case tracking-normal font-normal leading-[1.7]">
+                                    Atria Institute of Technology
+                                </p>
+                                <p className="text-[0.76rem] text-orange-500 normal-case tracking-normal font-normal leading-[1.7]">
+                                    Technical & Cultural Fest 2026
+                                </p>
+                            </div>
+                            <div className="relative w-full max-w-md rounded-xl overflow-hidden">
+                                <Image
+                                    src="/atria_bg.png"
+                                    alt="Atria campus banner"
+                                    width={420}
+                                    height={240}
+                                    className="w-full h-auto object-cover"
+                                />
+                            </div>
+                            <p className="text-[0.6rem] font-medium tracking-[0.12em] uppercase text-white/40 mb-0">
                                 Follow
                             </p>
-                            {SOCIAL_LINKS.map((s) => (
-                                <a
-                                    key={s.label}
-                                    href={s.href}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-[0.78rem] text-white/50 no-underline normal-case tracking-normal font-normal leading-[1.85] hover:text-orange-500 transition-colors duration-200"
-                                >
-                                    {s.label}
-                                </a>
-                            ))}
+                            <div className="flex items-center gap-4 whitespace-nowrap">
+                                {SOCIAL_LINKS.map((s) => (
+                                    <a
+                                        key={s.label}
+                                        href={s.href}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-[0.78rem] text-white/50 no-underline normal-case tracking-normal font-normal leading-[1.45] hover:text-orange-500 transition-colors duration-200"
+                                    >
+                                        {s.label}
+                                    </a>
+                                ))}
+                            </div>
                         </div>
 
-                        <div className="flex flex-col gap-1 flex-1 min-w-32.5">
+                        <div className="flex flex-col gap-3 flex-[1.35] min-w-76">
                             <p className="text-[0.6rem] font-medium tracking-[0.12em] uppercase text-white/40 mb-1">
                                 Contact
                             </p>
-                            <a
-                                href="mailto:info@vigyanrang.com"
-                                className="text-[0.78rem] text-white/50 no-underline normal-case tracking-normal font-normal leading-[1.85] hover:text-orange-500 transition-colors duration-200"
-                            >
-                                info@vigyanrang.com
-                            </a>
-                            {session && (
-                                <p className="text-[0.75rem] text-white/50 normal-case tracking-normal mt-1.5 leading-snug">
-                                    Signed in as{" "}
-                                    <span className="text-orange-500 font-semibold">
-                                        {session.user?.name?.split(" ")[0]}
-                                    </span>
-                                </p>
+                            {facultyContacts && (
+                                <div className="space-y-2.5">
+                                    <p className="text-[0.7rem] text-orange-400 font-semibold tracking-[0.08em] uppercase">
+                                        {facultyContacts.title}
+                                    </p>
+                                    {facultyContacts.entries.map((entry) => (
+                                        <div key={`${facultyContacts.title}-${entry.category}`} className="space-y-0.5">
+                                            <p className="text-[0.72rem] text-white/80 font-medium leading-snug">
+                                                {entry.category}
+                                            </p>
+                                            {entry.people.map((person) => (
+                                                <p key={`${entry.category}-${person.name}`} className="text-[0.72rem] text-white/55 leading-snug">
+                                                    <span className="text-white/85 font-medium">{person.name}</span>
+                                                    {person.role ? ` - ${person.role}` : ""}
+                                                    <span className="text-orange-400"> {person.phone}</span>
+                                                </p>
+                                            ))}
+                                        </div>
+                                    ))}
+                                </div>
                             )}
                         </div>
 
-                        <div className="flex flex-col gap-1 flex-1 min-w-32.5 items-end text-right max-sm:items-start max-sm:text-left">
-                            <p className="text-[0.7rem] text-white/80 normal-case tracking-normal font-normal leading-[1.7]">
-                                Atria Institute of Technology
-                            </p>
-                            <p className="text-[0.7rem] text-orange-500 normal-case tracking-normal font-normal leading-[1.7]">
-                                Technical & Cultural Fest 2026
-                            </p>
+                        <div className="flex flex-col gap-3 flex-1 min-w-56 items-start text-left lg:items-end lg:text-right">
+                            {studentContacts && (
+                                <div className="space-y-2.5">
+                                    <p className="text-[0.7rem] text-orange-400 font-semibold tracking-[0.08em] uppercase">
+                                        {studentContacts.title}
+                                    </p>
+                                    {studentContacts.entries.map((entry) => (
+                                        <div key={`${studentContacts.title}-${entry.category}`} className="space-y-0.5">
+                                            <p className="text-[0.72rem] text-white/80 font-medium leading-snug">
+                                                {entry.category}
+                                            </p>
+                                            {entry.people.map((person) => (
+                                                <p key={`${entry.category}-${person.name}`} className="text-[0.72rem] text-white/55 leading-snug">
+                                                    <span className="text-white/85 font-medium">{person.name}</span>
+                                                    <span className="text-orange-400"> {person.phone}</span>
+                                                </p>
+                                            ))}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
