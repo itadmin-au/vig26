@@ -42,7 +42,7 @@ interface VerifiedTicket {
         name: string;
         email: string;
         collegeId?: string;
-    };
+    } | null;
 }
 
 type ScanState =
@@ -135,12 +135,12 @@ function ResultCard({
                         "w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-sm font-bold",
                         alreadyIn ? "bg-amber-200 text-amber-700" : "bg-green-200 text-green-700"
                     )}>
-                        {user.name[0]?.toUpperCase()}
+                        {user?.name?.[0]?.toUpperCase() ?? "?"}
                     </div>
                     <div className="min-w-0">
-                        <p className="text-sm font-semibold text-zinc-900">{user.name}</p>
-                        <p className="text-xs text-zinc-500 truncate">{user.email}</p>
-                        {user.collegeId && (
+                        <p className="text-sm font-semibold text-zinc-900">{user?.name ?? "Unregistered member"}</p>
+                        <p className="text-xs text-zinc-500 truncate">{user?.email ?? "—"}</p>
+                        {user?.collegeId && (
                             <p className="text-xs text-zinc-400 font-mono mt-0.5">{user.collegeId}</p>
                         )}
                     </div>
@@ -482,7 +482,7 @@ export default function ManageScanPage() {
 
         if (result.success) {
             setStats(prev => ({ ...prev, checkedIn: prev.checkedIn + 1 }));
-            toast.success(`${scanState.ticket.userId.name} checked in!`);
+            toast.success(`${scanState.ticket.userId?.name ?? "Member"} checked in!`);
             setScanState({
                 status: "already_checked_in",
                 ticket: {

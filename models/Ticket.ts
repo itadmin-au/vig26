@@ -20,7 +20,7 @@ const TicketSchema = new Schema<ITicketDocument>(
         userId: {
             type: Schema.Types.ObjectId,
             ref: "User",
-            required: true,
+            required: false,
             index: true,
         },
         qrCode: {

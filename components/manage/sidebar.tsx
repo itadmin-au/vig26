@@ -16,6 +16,7 @@ import {
     IconMenu2,
     IconX,
     IconScan,
+    IconTools,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import type { UserRole } from "@/types";
@@ -56,6 +57,12 @@ const NAV_ITEMS: NavItem[] = [
         label: "Analytics",
         href: "/manage/analytics",
         icon: <IconChartBar size={20} />,
+        roles: ["super_admin"],
+    },
+    {
+        label: "Tools",
+        href: "/manage/tools",
+        icon: <IconTools size={20} />,
         roles: ["super_admin"],
     },
     {
