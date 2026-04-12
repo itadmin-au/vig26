@@ -11,11 +11,12 @@ import {
     removeDepartmentMember,
     upgradeExistingUser,
     deleteUser,
+    resetUserPassword,
 } from "@/actions/admin";
 import { toast } from "sonner";
 import {
     IconUserPlus, IconX, IconTrash, IconMail, IconClock,
-    IconShield, IconUsers, IconUserCheck, IconLoader2, IconUserMinus,
+    IconShield, IconUsers, IconUserCheck, IconLoader2, IconUserMinus, IconKey,
 } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -52,6 +53,9 @@ export default function ManageUsersPage() {
     const [pendingInvites, setPendingInvites] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
+    const [resetModal, setResetModal] = useState<{ userId: string; name: string } | null>(null);
+    const [newPassword, setNewPassword] = useState("");
+    const [resetLoading, setResetLoading] = useState(false);
 
     const [inviteName, setInviteName] = useState("");
     const [inviteEmail, setInviteEmail] = useState("");
@@ -89,7 +93,7 @@ export default function ManageUsersPage() {
         refreshMembers(selectedDeptId);
     }, [selectedDeptId]);
 
-    function resetModal() {
+    function resetInviteModal() {
         setInviteName("");
         setInviteEmail("");
         setInviteRole("coordinator");
@@ -99,7 +103,7 @@ export default function ManageUsersPage() {
     }
 
     function openModal() {
-        resetModal();
+        resetInviteModal();
         setShowModal(true);
     }
 
@@ -153,7 +157,7 @@ export default function ManageUsersPage() {
             if (result.success) {
                 toast.success(result.message ?? "Member added.");
                 setShowModal(false);
-                resetModal();
+                resetInviteModal();
                 refreshMembers(selectedDeptId);
             } else {
                 toast.error(result.error ?? "Failed to add member.");
@@ -169,7 +173,7 @@ export default function ManageUsersPage() {
             if (result.success) {
                 toast.success(result.message ?? "Invite sent.");
                 setShowModal(false);
-                resetModal();
+                resetInviteModal();
                 refreshMembers(selectedDeptId);
             } else {
                 toast.error(result.error ?? "Failed to send invite.");
@@ -213,6 +217,21 @@ export default function ManageUsersPage() {
             }));
         } else {
             toast.error(result.error ?? "Failed to delete user.");
+        }
+    }
+
+    async function handleResetPassword(e: React.FormEvent) {
+        e.preventDefault();
+        if (!resetModal) return;
+        setResetLoading(true);
+        const result = await resetUserPassword(resetModal.userId, newPassword);
+        setResetLoading(false);
+        if (result.success) {
+            toast.success(result.message ?? "Password reset.");
+            setResetModal(null);
+            setNewPassword("");
+        } else {
+            toast.error(result.error ?? "Failed to reset password.");
         }
     }
 
@@ -300,6 +319,13 @@ export default function ManageUsersPage() {
                                             {isSuperAdmin && (
                                                 <div className="flex items-center gap-1">
                                                     <button
+                                                        onClick={() => { setResetModal({ userId, name }); setNewPassword(""); }}
+                                                        title="Reset password"
+                                                        className="p-1.5 text-zinc-300 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                                                    >
+                                                        <IconKey size={15} />
+                                                    </button>
+                                                    <button
                                                         onClick={() => handleRemoveMember(userId, name)}
                                                         title="Remove from department"
                                                         className="p-1.5 text-zinc-300 hover:text-orange-500 hover:bg-orange-50 rounded-lg transition-colors"
@@ -359,6 +385,63 @@ export default function ManageUsersPage() {
                         </div>
                     )}
                 </>
+            )}
+
+            {resetModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+                    <div className="w-full max-w-sm bg-white rounded-2xl border border-zinc-200 shadow-xl p-6">
+                        <div className="flex items-start justify-between mb-5">
+                            <div>
+                                <div className="flex items-center gap-2 mb-1">
+                                    <IconKey size={18} className="text-blue-500" />
+                                    <h2 className="text-lg font-bold text-zinc-900">Reset Password</h2>
+                                </div>
+                                <p className="text-sm text-zinc-500">
+                                    Set a new password for <span className="font-medium text-zinc-700">{resetModal.name}</span>.
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setResetModal(null)}
+                                className="p-1.5 text-zinc-400 hover:text-zinc-700 rounded-lg hover:bg-zinc-100 transition-colors"
+                            >
+                                <IconX size={18} />
+                            </button>
+                        </div>
+                        <form onSubmit={handleResetPassword} className="space-y-4">
+                            <div>
+                                <Label htmlFor="newPassword">New Password</Label>
+                                <Input
+                                    id="newPassword"
+                                    type="password"
+                                    value={newPassword}
+                                    onChange={(e) => setNewPassword(e.target.value)}
+                                    placeholder="Min. 8 characters"
+                                    required
+                                    autoFocus
+                                    minLength={8}
+                                    className="mt-1"
+                                />
+                            </div>
+                            <div className="flex gap-3 pt-1">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => setResetModal(null)}
+                                    className="flex-1"
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    type="submit"
+                                    disabled={resetLoading}
+                                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                                >
+                                    {resetLoading ? "Resetting…" : "Reset Password"}
+                                </Button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
             )}
 
             {showModal && (

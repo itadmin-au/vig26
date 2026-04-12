@@ -17,6 +17,7 @@ import {
     generateInviteToken,
     getInviteExpiry,
     serialize,
+    hashPassword,
 } from "@/lib/utils";
 import { sendManagementInviteEmail } from "@/lib/email";
 
@@ -296,6 +297,24 @@ export async function cancelInvite(inviteId: string) {
 
     await Invite.findByIdAndUpdate(inviteId, { status: "cancelled" });
     return { success: true };
+}
+
+export async function resetUserPassword(userId: string, newPassword: string) {
+    await requireSuperAdmin();
+
+    if (!newPassword || newPassword.length < 8) {
+        return { success: false, error: "Password must be at least 8 characters." };
+    }
+
+    await connectDB();
+
+    const user = await User.findById(userId);
+    if (!user) return { success: false, error: "User not found." };
+
+    const hash = await hashPassword(newPassword);
+    await User.findByIdAndUpdate(userId, { passwordHash: hash });
+
+    return { success: true, message: `Password reset for ${user.name}.` };
 }
 
 export async function removeDepartmentMember(departmentId: string, userId: string) {
