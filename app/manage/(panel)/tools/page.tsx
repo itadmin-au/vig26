@@ -6,7 +6,7 @@ import {
     IconTicket, IconLoader2, IconCircleCheck, IconCircleX,
     IconAlertTriangle, IconSearch, IconUser, IconCalendarEvent,
     IconMapPin, IconId, IconPlus, IconX,
-    IconChevronDown, IconDownload,
+    IconChevronDown, IconDownload, IconBan,
 } from "@tabler/icons-react";
 import { toast } from "sonner";
 import { getManageEvents } from "@/actions/events";
@@ -636,6 +636,214 @@ function CreateManualTicketSection() {
     );
 }
 
+// ─── Section: Cancel Ticket ───────────────────────────────────────────────────
+
+function CancelTicketSection() {
+    const [ticketId, setTicketId] = useState("");
+    const [lookupLoading, setLookupLoading] = useState(false);
+    const [lookupError, setLookupError] = useState<string | null>(null);
+    const [preview, setPreview] = useState<{
+        ticketId: string;
+        qrCode: string;
+        teamRole: string;
+        attendanceStatus: boolean;
+        recipientName: string | null;
+        recipientEmail: string | null;
+        registration: {
+            registrationId: string;
+            paymentId: string | null;
+            status: string;
+            paymentStatus: string;
+            event: { title: string };
+            registrant: { name: string | null; email: string | null; collegeId: string | null };
+            ticketCount: number;
+        };
+    } | null>(null);
+    const [confirmOpen, setConfirmOpen] = useState(false);
+    const [cancelLoading, setCancelLoading] = useState(false);
+    const [cancelled, setCancelled] = useState(false);
+
+    async function handleLookup(e: React.FormEvent<HTMLFormElement>) {
+        e.preventDefault();
+        if (!ticketId.trim()) return;
+        setLookupLoading(true);
+        setLookupError(null);
+        setPreview(null);
+        setConfirmOpen(false);
+        setCancelled(false);
+        try {
+            const res = await fetch(`/api/admin/cancel-ticket?ticketId=${encodeURIComponent(ticketId.trim())}`);
+            const json = await res.json();
+            if (json.success) setPreview(json.data);
+            else setLookupError(json.error ?? "Not found.");
+        } catch {
+            setLookupError("Network error.");
+        } finally {
+            setLookupLoading(false);
+        }
+    }
+
+    async function handleCancel() {
+        if (!preview) return;
+        setCancelLoading(true);
+        try {
+            const res = await fetch("/api/admin/cancel-ticket", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ticketId: ticketId.trim() }),
+            });
+            const json = await res.json();
+            if (json.success) {
+                setCancelled(true);
+                setConfirmOpen(false);
+                toast.success("Registration cancelled successfully.");
+            } else {
+                toast.error(json.error ?? "Failed to cancel.");
+            }
+        } catch {
+            toast.error("Network error.");
+        } finally {
+            setCancelLoading(false);
+        }
+    }
+
+    function reset() {
+        setTicketId("");
+        setPreview(null);
+        setLookupError(null);
+        setConfirmOpen(false);
+        setCancelled(false);
+    }
+
+    return (
+        <div className="bg-white rounded-xl border border-zinc-200 p-5 space-y-4">
+            <div className="flex items-center gap-2">
+                <IconBan size={18} className="text-red-500" />
+                <h2 className="text-sm font-semibold text-zinc-900">Cancel Ticket</h2>
+            </div>
+            <p className="text-xs text-zinc-500">
+                Cancel a registration by ticket ID (QR code string or ObjectId). This sets the registration status to&nbsp;
+                <span className="font-mono">cancelled</span> and decrements the event&apos;s registration count.
+            </p>
+
+            <form onSubmit={handleLookup} className="flex gap-2">
+                <input
+                    type="text"
+                    value={ticketId}
+                    onChange={(e) => { setTicketId(e.target.value); setPreview(null); setLookupError(null); setCancelled(false); setConfirmOpen(false); }}
+                    placeholder="vig_f239a2106f_mnvtodrl or ObjectId"
+                    className="flex-1 px-3 py-2 text-sm border border-zinc-200 rounded-lg font-mono placeholder:font-sans placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent"
+                />
+                <button
+                    type="submit"
+                    disabled={lookupLoading || !ticketId.trim()}
+                    className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-zinc-700 border border-zinc-200 rounded-lg hover:bg-zinc-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                >
+                    {lookupLoading ? <IconLoader2 size={15} className="animate-spin" /> : <IconSearch size={15} />}
+                    Look up
+                </button>
+            </form>
+
+            {lookupError && (
+                <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-100 rounded-lg">
+                    <IconAlertTriangle size={15} className="text-red-500 mt-0.5 shrink-0" />
+                    <p className="text-sm text-red-700">{lookupError}</p>
+                </div>
+            )}
+
+            {cancelled && (
+                <div className="flex items-start gap-2 p-3 bg-green-50 border border-green-100 rounded-lg">
+                    <IconCircleCheck size={15} className="text-green-600 mt-0.5 shrink-0" />
+                    <div>
+                        <p className="text-sm font-medium text-green-800">Registration cancelled.</p>
+                        <button onClick={reset} className="mt-1 text-xs text-green-600 hover:text-green-800 transition-colors">Cancel another →</button>
+                    </div>
+                </div>
+            )}
+
+            {preview && !cancelled && (
+                <div className="space-y-4 pt-1">
+                    <div className="border border-zinc-200 rounded-lg overflow-hidden text-sm">
+                        <div className="px-4 py-3 bg-zinc-50 border-b border-zinc-100">
+                            <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-1">Event</p>
+                            <p className="font-semibold text-zinc-900">{preview.registration.event.title}</p>
+                        </div>
+                        <div className="px-4 py-3 border-b border-zinc-100">
+                            <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-1">Registrant</p>
+                            <p className="text-zinc-700">{preview.registration.registrant.name ?? "—"} · {preview.registration.registrant.email ?? "—"}</p>
+                            {preview.registration.registrant.collegeId && (
+                                <p className="text-xs text-zinc-400 mt-0.5 flex items-center gap-1"><IconId size={11} />{preview.registration.registrant.collegeId}</p>
+                            )}
+                            <div className="flex gap-2 mt-2 flex-wrap">
+                                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusColor(preview.registration.status)}`}>{preview.registration.status}</span>
+                                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusColor(preview.registration.paymentStatus)}`}>payment: {preview.registration.paymentStatus}</span>
+                            </div>
+                            <p className="text-xs text-zinc-400 font-mono mt-1">{preview.registration.registrationId}</p>
+                        </div>
+                        <div className="px-4 py-3">
+                            <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-1">Ticket</p>
+                            <p className="text-zinc-700">
+                                {preview.recipientName ?? <span className="italic text-zinc-400">No user linked</span>}
+                                {preview.recipientEmail && <span className="text-zinc-400"> · {preview.recipientEmail}</span>}
+                            </p>
+                            <p className="text-xs text-zinc-400 font-mono mt-0.5">{preview.qrCode}</p>
+                            <div className="flex gap-1.5 mt-1.5">
+                                <span className="text-xs px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-500 capitalize">{preview.teamRole}</span>
+                                {preview.attendanceStatus && <span className="text-xs px-1.5 py-0.5 rounded bg-amber-50 text-amber-600">already checked in</span>}
+                                <span className="text-xs px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-500">{preview.registration.ticketCount} ticket{preview.registration.ticketCount !== 1 ? "s" : ""} in registration</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {preview.registration.status === "cancelled" ? (
+                        <div className="flex items-start gap-2 p-3 bg-zinc-50 border border-zinc-200 rounded-lg">
+                            <IconAlertTriangle size={15} className="text-zinc-400 mt-0.5 shrink-0" />
+                            <p className="text-sm text-zinc-500">This registration is already cancelled.</p>
+                        </div>
+                    ) : confirmOpen ? (
+                        <div className="space-y-3">
+                            <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                                <IconAlertTriangle size={15} className="text-red-500 mt-0.5 shrink-0" />
+                                <p className="text-sm text-red-700">
+                                    This will cancel the entire registration ({preview.registration.ticketCount} ticket{preview.registration.ticketCount !== 1 ? "s" : ""}).
+                                    This action cannot be undone from the UI.
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={handleCancel}
+                                    disabled={cancelLoading}
+                                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-red-500 hover:bg-red-600 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {cancelLoading
+                                        ? <><IconLoader2 size={15} className="animate-spin" /> Cancelling…</>
+                                        : <><IconBan size={15} /> Yes, Cancel Registration</>}
+                                </button>
+                                <button
+                                    onClick={() => setConfirmOpen(false)}
+                                    className="px-3 py-2 text-sm text-zinc-500 hover:text-zinc-700 transition-colors"
+                                >
+                                    Go back
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setConfirmOpen(true)}
+                                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-red-500 hover:bg-red-600 rounded-lg transition-colors"
+                            >
+                                <IconBan size={15} /> Cancel Registration
+                            </button>
+                            <button onClick={reset} className="px-3 py-2 text-sm text-zinc-500 hover:text-zinc-700 transition-colors">Clear</button>
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ToolsPage() {
@@ -665,6 +873,7 @@ export default function ToolsPage() {
             </div>
             <CreateManualTicketSection />
             <RegenerateSection />
+            <CancelTicketSection />
         </div>
     );
 }

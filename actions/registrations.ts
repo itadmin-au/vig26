@@ -190,7 +190,7 @@ export async function getMyTickets(): Promise<ITicket[]> {
     await connectDB();
 
     const tickets = await Ticket.find({ userId: session.user.id })
-        .populate("eventId", "title slug date venue coverImage category type status")
+        .populate("eventId", "title slug date venue coverImage category type status whatsappLink")
         .populate("registrationId", "status paymentStatus")
         .sort({ createdAt: -1 })
         .lean();

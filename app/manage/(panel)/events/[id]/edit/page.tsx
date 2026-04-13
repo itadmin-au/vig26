@@ -287,6 +287,7 @@ export default function EditEventPage() {
     const [teamSizeMin, setTeamSizeMin] = useState(2);
     const [teamSizeMax, setTeamSizeMax] = useState(5);
     const [googleSheetId, setGoogleSheetId] = useState("");
+    const [whatsappLink, setWhatsappLink] = useState("");
     const [expanded, setExpanded] = useState({
         basic: true, details: true, rules: false, team: false, form: false, slots: false, rounds: false,
     });
@@ -310,6 +311,7 @@ export default function EditEventPage() {
                 setCoverImageUrl(found.coverImage ?? null);
                 setDescription(found.description ?? "");
                 setGoogleSheetId(found.googleSheetId ?? "");
+                setWhatsappLink((found as any).whatsappLink ?? "");
                 setRules(found.rules ?? "");
                 setSelectedDeptId(
                     typeof found.department === "string"
@@ -418,6 +420,7 @@ export default function EditEventPage() {
         formData.set("slots", useSlots ? JSON.stringify(slots) : "[]");
         formData.set("rounds", JSON.stringify(rounds));
         formData.set("googleSheetId", googleSheetId.trim());
+        formData.set("whatsappLink", whatsappLink.trim());
 
         // Pass current Cloudinary URL (or empty string to signal removal)
         formData.set("coverImage", coverImageUrl ?? "");
@@ -828,17 +831,16 @@ export default function EditEventPage() {
                 </div>
 
                 <div className="bg-white rounded-xl border border-zinc-200 px-5 py-4 space-y-2">
-                    <Label htmlFor="googleSheetId">Google Sheet ID</Label>
+                    <Label htmlFor="whatsappLink">WhatsApp Group Link <span className="text-zinc-400 font-normal">(optional)</span></Label>
                     <p className="text-xs text-zinc-400">
-                        Registrations will be appended automatically after each confirmed payment.
-                        Share the sheet with your service account email (Editor access).
+                        Shown to participants after successful registration on the confirmation screen and in their My Tickets page.
                     </p>
                     <Input
-                        id="googleSheetId"
-                        value={googleSheetId}
-                        onChange={(e) => setGoogleSheetId(e.target.value)}
-                        placeholder="e.g. 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms"
-                        className="mt-1 font-mono text-xs"
+                        id="whatsappLink"
+                        value={whatsappLink}
+                        onChange={(e) => setWhatsappLink(e.target.value)}
+                        placeholder="https://chat.whatsapp.com/..."
+                        className="mt-1"
                     />
                 </div>
 

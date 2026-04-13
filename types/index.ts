@@ -169,6 +169,8 @@ export interface IEvent {
     googleSheetId?: string;
     /** Secret token for the public CSV feed URL */
     csvToken?: string;
+    /** WhatsApp group/channel invite link shown after registration */
+    whatsappLink?: string;
     /** Optional time slots; when present, registrations must pick a slot */
     slots?: IEventSlot[];
     /** Sequential rounds (e.g. prelims, semi-finals, finals) — informational only */

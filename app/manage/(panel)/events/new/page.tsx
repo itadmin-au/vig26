@@ -328,6 +328,7 @@ export default function NewEventPage() {
     const [isTeamEvent, setIsTeamEvent] = useState(false);
     const [teamSizeMin, setTeamSizeMin] = useState(2);
     const [teamSizeMax, setTeamSizeMax] = useState(5);
+    const [whatsappLink, setWhatsappLink] = useState("");
     const [expandedSections, setExpandedSections] = useState({
         basic: true, details: true, rules: false, team: false, form: false, slots: false, rounds: false,
     });
@@ -457,6 +458,7 @@ export default function NewEventPage() {
         formData.set("customForm", JSON.stringify(formFields.map((f, i) => ({ ...f, order: i }))));
         formData.set("slots", useSlots ? JSON.stringify(slots) : "[]");
         formData.set("rounds", JSON.stringify(rounds));
+        formData.set("whatsappLink", whatsappLink.trim());
 
         // Pass the already-uploaded Cloudinary URL as a plain string
         if (coverImageUrl) {
@@ -704,6 +706,18 @@ export default function NewEventPage() {
                                     <Input id="price" type="number" min="0" value={price} onChange={(e) => setPrice(e.target.value)} className="mt-1" />
                                     <p className="text-xs text-zinc-400 mt-1">0 = free event.</p>
                                 </div>
+                            </div>
+
+                            <div>
+                                <Label htmlFor="whatsappLink">WhatsApp Group Link <span className="text-zinc-400 font-normal">(optional)</span></Label>
+                                <Input
+                                    id="whatsappLink"
+                                    value={whatsappLink}
+                                    onChange={(e) => setWhatsappLink(e.target.value)}
+                                    placeholder="https://chat.whatsapp.com/..."
+                                    className="mt-1"
+                                />
+                                <p className="text-xs text-zinc-400 mt-1">Shown to participants after successful registration.</p>
                             </div>
                         </div>
                     )}

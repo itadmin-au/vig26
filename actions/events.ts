@@ -188,6 +188,8 @@ export async function createEvent(formData: FormData) {
 
     await requireDepartmentAccess(departmentId);
 
+    const whatsappLinkCreate = (raw.whatsappLink as string | undefined)?.trim() || undefined;
+
     const event = await Event.create({
         ...rest,
         department: departmentId,
@@ -196,6 +198,7 @@ export async function createEvent(formData: FormData) {
         ...(parsed.data.isTeamEvent && teamSizeMin && teamSizeMax
             ? { teamSize: { min: teamSizeMin, max: teamSizeMax } }
             : {}),
+        whatsappLink: whatsappLinkCreate,
         slots: slots.map((s) => ({
             label: s.label || undefined,
             start: new Date(s.start),
@@ -340,6 +343,11 @@ export async function updateEvent(id: string, formData: FormData) {
     // Google Sheet ID — stored directly, not part of the zod schema
     const googleSheetId = (raw.googleSheetId as string | undefined)?.trim();
     updates.googleSheetId = googleSheetId || null;
+
+    // WhatsApp link — stored directly, not part of the zod schema
+    if ("whatsappLink" in raw) {
+        updates.whatsappLink = (raw.whatsappLink as string | undefined)?.trim() || null;
+    }
 
     const updated = await Event.findByIdAndUpdate(id, updates, {
         returnDocument: "after",
