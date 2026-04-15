@@ -18,6 +18,7 @@ import {
     IconScan,
     IconTools,
     IconMail,
+    IconTimeline,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import type { UserRole } from "@/types";
@@ -40,6 +41,12 @@ const NAV_ITEMS: NavItem[] = [
         label: "Events",
         href: "/manage/events",
         icon: <IconCalendarEvent size={20} />,
+        roles: ["coordinator", "dept_admin", "super_admin"],
+    },
+    {
+        label: "Schedule",
+        href: "/manage/schedule",
+        icon: <IconTimeline size={20} />,
         roles: ["coordinator", "dept_admin", "super_admin"],
     },
     {

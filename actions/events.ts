@@ -90,6 +90,18 @@ export async function syncAllEventRegistrationCounts() {
     return { success: true };
 }
 
+export async function getAllEventsForSchedule(): Promise<IEvent[]> {
+    await requireManagement();
+    await connectDB();
+
+    const events = await Event.find({})
+        .sort({ "date.start": 1 })
+        .populate("department", "name")
+        .lean();
+
+    return serialize(events) as IEvent[];
+}
+
 export async function getManageEvents(
     departmentId?: string,
     status?: string
