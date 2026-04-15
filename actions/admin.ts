@@ -342,6 +342,7 @@ export async function getAnalytics() {
         totalRegistrations,
         confirmedRegistrations,
         recentRegistrations,
+        pendingRegistrations,
         topEvents,
     ] = await Promise.all([
         Event.countDocuments(),
@@ -349,10 +350,15 @@ export async function getAnalytics() {
         Registration.countDocuments(),
         Registration.countDocuments({ status: "confirmed" }),
         Registration.find({ status: "confirmed" })
-            .populate("eventId", "title")
+            .populate("eventId", "title _id")
             .populate("userId", "name email")
             .sort({ createdAt: -1 })
             .limit(10)
+            .lean(),
+        Registration.find({ status: { $ne: "confirmed" } })
+            .populate("eventId", "title _id")
+            .populate("userId", "name email")
+            .sort({ createdAt: -1 })
             .lean(),
         Event.find({ status: "published" })
             .select("title registrationCount capacity")
@@ -386,6 +392,7 @@ export async function getAnalytics() {
             confirmedRegistrations,
             totalRevenue,
             recentRegistrations,
+            pendingRegistrations,
             topEvents,
         }),
     };
