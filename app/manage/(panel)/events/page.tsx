@@ -303,6 +303,17 @@ export default function ManageEventsPage() {
                     ))}
                 </div>
 
+                {/* Column headers */}
+                <div className="hidden md:flex items-center gap-4 px-5 py-2 border-b border-zinc-100 bg-zinc-50/60">
+                    <div className="w-10 shrink-0" />
+                    <div className="flex-1 min-w-0 text-xs font-medium text-zinc-400 uppercase tracking-wide">Event</div>
+                    <div className="w-20 text-center text-xs font-medium text-zinc-400 uppercase tracking-wide shrink-0">Price</div>
+                    <div className="w-20 text-center text-xs font-medium text-zinc-400 uppercase tracking-wide shrink-0">Team</div>
+                    <div className="w-24 text-center text-xs font-medium text-zinc-400 uppercase tracking-wide shrink-0">Registrations</div>
+                    <div className="w-32 text-xs font-medium text-zinc-400 uppercase tracking-wide shrink-0">Status</div>
+                    <div className="w-8 shrink-0" />
+                </div>
+
                 {/* Events Table */}
                 {loading ? (
                     <div className="divide-y divide-zinc-100">
@@ -339,7 +350,7 @@ export default function ManageEventsPage() {
                         {filtered.map((event) => (
                             <div
                                 key={event._id.toString()}
-                                className="flex items-center gap-4 px-5 py-4 hover:bg-zinc-50 transition-colors"
+                                className="flex items-center gap-4 px-5 py-3.5 hover:bg-zinc-50 transition-colors"
                             >
                                 {/* Clickable area */}
                                 <Link
@@ -372,31 +383,32 @@ export default function ManageEventsPage() {
                                     </div>
 
                                     {/* Price */}
-                                    <div className="hidden md:block text-center shrink-0 w-16">
-                                        <p className="text-sm font-semibold text-zinc-900">
+                                    <div className="hidden md:flex w-20 shrink-0 justify-center">
+                                        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
+                                            event.price === 0
+                                                ? "bg-green-50 text-green-700"
+                                                : "bg-zinc-100 text-zinc-700"
+                                        }`}>
                                             {event.price === 0 ? "Free" : `₹${event.price}`}
-                                        </p>
-                                        <p className="text-xs text-zinc-400">price</p>
+                                        </span>
                                     </div>
 
                                     {/* Team size */}
-                                    <div className="hidden md:block text-center shrink-0 w-16">
-                                        <p className="text-sm font-semibold text-zinc-900">
+                                    <div className="hidden md:flex w-20 shrink-0 justify-center">
+                                        <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700">
                                             {event.isTeamEvent && event.teamSize
                                                 ? `${event.teamSize.min}–${event.teamSize.max}`
                                                 : "Solo"}
-                                        </p>
-                                        <p className="text-xs text-zinc-400">team size</p>
+                                        </span>
                                     </div>
 
                                     {/* Registrations */}
-                                    <div className="hidden sm:block text-center shrink-0 w-16">
+                                    <div className="hidden sm:block w-24 shrink-0 text-center">
                                         <p className="text-sm font-semibold text-zinc-900">{event.registrationCount}</p>
-                                        <p className="text-xs text-zinc-400">registrations</p>
                                     </div>
 
-                                    {/* Status badges */}
-                                    <div className="hidden sm:flex items-center gap-1.5 shrink-0">
+                                    {/* Status */}
+                                    <div className="hidden sm:flex w-32 shrink-0 items-center gap-1.5">
                                         <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${
                                             event.status === "published"
                                                 ? "bg-green-50 text-green-700"
