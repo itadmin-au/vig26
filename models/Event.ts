@@ -150,6 +150,10 @@ const EventSchema = new Schema<IEventDocument>(
       type: String,
       default: null,
     },
+    externalRegistrationUrl: {
+      type: String,
+      default: null,
+    },
     csvToken: {
       type: String,
       default: null,

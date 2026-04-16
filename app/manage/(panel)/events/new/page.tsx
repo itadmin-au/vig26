@@ -330,6 +330,7 @@ export default function NewEventPage() {
     const [teamSizeMin, setTeamSizeMin] = useState(2);
     const [teamSizeMax, setTeamSizeMax] = useState(5);
     const [whatsappLink, setWhatsappLink] = useState("");
+    const [externalRegistrationUrl, setExternalRegistrationUrl] = useState("");
     const [expandedSections, setExpandedSections] = useState({
         basic: true, details: true, rules: false, team: false, form: false, slots: false, rounds: false,
     });
@@ -461,6 +462,7 @@ export default function NewEventPage() {
         formData.set("slots", useSlots ? JSON.stringify(slots) : "[]");
         formData.set("rounds", JSON.stringify(rounds));
         formData.set("whatsappLink", whatsappLink.trim());
+        formData.set("externalRegistrationUrl", externalRegistrationUrl.trim());
 
         // Pass the already-uploaded Cloudinary URL as a plain string
         if (coverImageUrl) {
@@ -744,6 +746,18 @@ export default function NewEventPage() {
                                     className="mt-1"
                                 />
                                 <p className="text-xs text-zinc-400 mt-1">Shown to participants after successful registration.</p>
+                            </div>
+
+                            <div>
+                                <Label htmlFor="externalRegistrationUrl">External Registration URL <span className="text-zinc-400 font-normal">(optional)</span></Label>
+                                <Input
+                                    id="externalRegistrationUrl"
+                                    value={externalRegistrationUrl}
+                                    onChange={(e) => setExternalRegistrationUrl(e.target.value)}
+                                    placeholder="https://devfolio.co/..."
+                                    className="mt-1"
+                                />
+                                <p className="text-xs text-zinc-400 mt-1">If set, the Register button will redirect to this URL instead of the internal registration flow.</p>
                             </div>
                         </div>
                     )}

@@ -25,7 +25,6 @@
 "use client"
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { useSession } from "next-auth/react"
 import { Canvas } from "@react-three/fiber"
 import { ACESFilmicToneMapping } from "three"
 import { OrbitControls } from "@react-three/drei"
@@ -70,9 +69,6 @@ function Divider() {
 
 export default function CubePage() {
   const { days, hrs, mins, secs } = useCountdown(TARGET_DATE)
-  const { status } = useSession()
-  const isAuthenticated = status === "authenticated"
-
   return (
     <div className="relative -mt-10 flex w-full min-h-dvh flex-col overflow-hidden pt-10 md:flex-row">
 
@@ -128,8 +124,10 @@ export default function CubePage() {
           >
             Browse Events
           </Link>
-          <Link
-            href={isAuthenticated ? "/dashboard" : "/auth/login"}
+          <a
+            href="https://cepheus-2.devfolio.co/overview"
+            target="_blank"
+            rel="noopener noreferrer"
             className="px-6 py-3 font-semibold rounded-xl border transition-colors"
             style={{
               background: "oklch(1 0 0 / 0.12)",
@@ -140,8 +138,8 @@ export default function CubePage() {
             onMouseEnter={e => (e.currentTarget.style.background = "oklch(1 0 0 / 0.22)")}
             onMouseLeave={e => (e.currentTarget.style.background = "oklch(1 0 0 / 0.12)")}
           >
-            {isAuthenticated ? "My Events" : "Sign In"}
-          </Link>
+            Cepheus 2.0
+          </a>
         </div>
 
         <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 md:justify-start">

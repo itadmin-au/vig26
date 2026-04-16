@@ -427,6 +427,16 @@ export default function EventDetailPage() {
                                     <IconTicket size={16} />
                                     View Ticket
                                 </Link>
+                            ) : event.externalRegistrationUrl ? (
+                                <a
+                                    href={event.externalRegistrationUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center justify-center gap-2 w-full py-2.5 bg-orange-500 hover:bg-orange-400 text-white text-sm font-semibold rounded-xl transition-colors"
+                                >
+                                    <IconTicket size={16} />
+                                    Register on Devfolio
+                                </a>
                             ) : (
                                 <Link
                                     href={registerHref}

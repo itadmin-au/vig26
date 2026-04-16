@@ -202,6 +202,7 @@ export async function createEvent(formData: FormData) {
     await requireDepartmentAccess(departmentId);
 
     const whatsappLinkCreate = (raw.whatsappLink as string | undefined)?.trim() || undefined;
+    const externalRegistrationUrlCreate = (raw.externalRegistrationUrl as string | undefined)?.trim() || undefined;
 
     const event = await Event.create({
         ...rest,
@@ -212,6 +213,7 @@ export async function createEvent(formData: FormData) {
             ? { teamSize: { min: teamSizeMin, max: teamSizeMax } }
             : {}),
         whatsappLink: whatsappLinkCreate,
+        externalRegistrationUrl: externalRegistrationUrlCreate,
         slots: slots.map((s) => ({
             label: s.label || undefined,
             start: new Date(s.start),
@@ -361,6 +363,11 @@ export async function updateEvent(id: string, formData: FormData) {
     // WhatsApp link — stored directly, not part of the zod schema
     if ("whatsappLink" in raw) {
         updates.whatsappLink = (raw.whatsappLink as string | undefined)?.trim() || null;
+    }
+
+    // External registration URL — bypasses the internal registration flow
+    if ("externalRegistrationUrl" in raw) {
+        updates.externalRegistrationUrl = (raw.externalRegistrationUrl as string | undefined)?.trim() || null;
     }
 
     const updated = await Event.findByIdAndUpdate(id, updates, {

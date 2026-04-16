@@ -511,6 +511,7 @@ export default function RegisterPage() {
         if (status === "loading") return;
         getEventBySlug(slug as string).then((data) => {
             if (!data || data.status !== "published") { router.replace(`/events/${slug}`); return; }
+            if (data.externalRegistrationUrl) { router.replace(`/events/${slug}`); return; }
             setEvent(data);
             setLeaderName(session?.user?.name ?? "");
             if (data.isTeamEvent && data.teamSize) {

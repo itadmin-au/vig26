@@ -173,6 +173,8 @@ export interface IEvent {
     csvToken?: string;
     /** WhatsApp group/channel invite link shown after registration */
     whatsappLink?: string;
+    /** If set, the Register button links here instead of the internal registration flow */
+    externalRegistrationUrl?: string;
     /** Optional time slots; when present, registrations must pick a slot */
     slots?: IEventSlot[];
     /** Sequential rounds (e.g. prelims, semi-finals, finals) — informational only */

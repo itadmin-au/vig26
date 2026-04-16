@@ -290,6 +290,7 @@ export default function EditEventPage() {
     const [teamSizeMax, setTeamSizeMax] = useState(5);
     const [googleSheetId, setGoogleSheetId] = useState("");
     const [whatsappLink, setWhatsappLink] = useState("");
+    const [externalRegistrationUrl, setExternalRegistrationUrl] = useState("");
     const [expanded, setExpanded] = useState({
         basic: true, details: true, rules: false, team: false, form: false, slots: false, rounds: false,
     });
@@ -316,6 +317,7 @@ export default function EditEventPage() {
                 setDescription(found.description ?? "");
                 setGoogleSheetId(found.googleSheetId ?? "");
                 setWhatsappLink((found as any).whatsappLink ?? "");
+                setExternalRegistrationUrl((found as any).externalRegistrationUrl ?? "");
                 setRules(found.rules ?? "");
                 setSelectedDeptId(
                     typeof found.department === "string"
@@ -427,6 +429,7 @@ export default function EditEventPage() {
         formData.set("rounds", JSON.stringify(rounds));
         formData.set("googleSheetId", googleSheetId.trim());
         formData.set("whatsappLink", whatsappLink.trim());
+        formData.set("externalRegistrationUrl", externalRegistrationUrl.trim());
 
         // Pass current Cloudinary URL (or empty string to signal removal)
         formData.set("coverImage", coverImageUrl ?? "");
@@ -871,6 +874,20 @@ export default function EditEventPage() {
                         value={whatsappLink}
                         onChange={(e) => setWhatsappLink(e.target.value)}
                         placeholder="https://chat.whatsapp.com/..."
+                        className="mt-1"
+                    />
+                </div>
+
+                <div className="bg-white rounded-xl border border-zinc-200 px-5 py-4 space-y-2">
+                    <Label htmlFor="externalRegistrationUrl">External Registration URL <span className="text-zinc-400 font-normal">(optional)</span></Label>
+                    <p className="text-xs text-zinc-400">
+                        If set, the Register button on the event page will redirect to this URL instead of the internal registration flow.
+                    </p>
+                    <Input
+                        id="externalRegistrationUrl"
+                        value={externalRegistrationUrl}
+                        onChange={(e) => setExternalRegistrationUrl(e.target.value)}
+                        placeholder="https://devfolio.co/..."
                         className="mt-1"
                     />
                 </div>
