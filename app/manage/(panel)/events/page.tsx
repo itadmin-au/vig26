@@ -368,12 +368,29 @@ export default function ManageEventsPage() {
                                             <span className="capitalize">{event.type}</span>
                                             {" · "}
                                             <span className="capitalize">{event.category}</span>
-                                            {event.price === 0 ? " · Free" : ` · ₹${event.price}`}
                                         </p>
                                     </div>
 
+                                    {/* Price */}
+                                    <div className="hidden md:block text-center shrink-0 w-16">
+                                        <p className="text-sm font-semibold text-zinc-900">
+                                            {event.price === 0 ? "Free" : `₹${event.price}`}
+                                        </p>
+                                        <p className="text-xs text-zinc-400">price</p>
+                                    </div>
+
+                                    {/* Team size */}
+                                    <div className="hidden md:block text-center shrink-0 w-16">
+                                        <p className="text-sm font-semibold text-zinc-900">
+                                            {event.isTeamEvent && event.teamSize
+                                                ? `${event.teamSize.min}–${event.teamSize.max}`
+                                                : "Solo"}
+                                        </p>
+                                        <p className="text-xs text-zinc-400">team size</p>
+                                    </div>
+
                                     {/* Registrations */}
-                                    <div className="hidden sm:block text-center shrink-0">
+                                    <div className="hidden sm:block text-center shrink-0 w-16">
                                         <p className="text-sm font-semibold text-zinc-900">{event.registrationCount}</p>
                                         <p className="text-xs text-zinc-400">registrations</p>
                                     </div>
