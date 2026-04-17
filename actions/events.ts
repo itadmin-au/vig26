@@ -479,21 +479,6 @@ export async function updateEvent(id: string, formData: FormData) {
 
     const updates: Record<string, unknown> = { ...rest };
 
-    // Preserve existing _id on customForm subdocuments so registration formResponses stay linked.
-    // Zod passes _id through as a string; only accept valid 24-char hex ObjectIds.
-    if (raw.customForm !== undefined && Array.isArray(updates.customForm)) {
-        const isValidObjectId = (id: string) => /^[0-9a-f]{24}$/i.test(id);
-        updates.customForm = (updates.customForm as any[]).map((f) => ({
-            ...(f._id && isValidObjectId(f._id) ? { _id: f._id } : {}),
-            label: f.label,
-            type: f.type,
-            placeholder: f.placeholder,
-            isRequired: f.isRequired,
-            options: f.options,
-            order: f.order,
-        }));
-    }
-
     // Explicitly handle coverImage removal: if raw had coverImage key but it's empty, unset it
     if ("coverImage" in raw && !raw.coverImage) {
         updates.coverImage = null;
@@ -563,9 +548,35 @@ export async function updateEvent(id: string, formData: FormData) {
         updates.registrationInstructions = (raw.registrationInstructions as string | undefined)?.trim() || null;
     }
 
-    const updated = await Event.findByIdAndUpdate(id, updates, {
-        returnDocument: "after",
-    }).lean();
+    // customForm must be set via doc.save() so Mongoose preserves existing subdocument _id values.
+    // findByIdAndUpdate regenerates _id for every subdocument, breaking registration formResponse links.
+    let updated: any;
+    if (raw.customForm !== undefined && Array.isArray(updates.customForm)) {
+        const isValidObjectId = (v: string) => /^[0-9a-f]{24}$/i.test(v);
+        const { customForm: newFields, ...otherUpdates } = updates;
+        const doc = await Event.findByIdAndUpdate(id, otherUpdates, { returnDocument: "after" });
+        if (!doc) return { success: false, error: "Event not found." };
+        // Rebuild customForm: keep existing subdocs by _id, add new ones without _id
+        const existingById = new Map((doc.customForm as any[]).map((f: any) => [f._id.toString(), f]));
+        doc.customForm = (newFields as any[]).map((f: any) => {
+            if (f._id && isValidObjectId(f._id) && existingById.has(f._id)) {
+                const sub = existingById.get(f._id);
+                sub.label = f.label;
+                sub.type = f.type;
+                sub.placeholder = f.placeholder ?? undefined;
+                sub.isRequired = f.isRequired ?? false;
+                sub.options = f.options ?? [];
+                sub.order = f.order;
+                return sub;
+            }
+            // New field — let Mongoose assign a fresh _id
+            return { label: f.label, type: f.type, placeholder: f.placeholder, isRequired: f.isRequired ?? false, options: f.options ?? [], order: f.order };
+        }) as any;
+        await doc.save();
+        updated = doc.toObject();
+    } else {
+        updated = await Event.findByIdAndUpdate(id, updates, { returnDocument: "after" }).lean();
+    }
 
     await logAudit(id, session, "update", buildUpdateSummary(event, updates));
     void syncCategoryOverviewSheet(event.category);

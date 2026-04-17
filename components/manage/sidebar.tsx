@@ -19,6 +19,7 @@ import {
     IconTools,
     IconMail,
     IconTimeline,
+    IconClipboardList,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import type { UserRole } from "@/types";
@@ -59,6 +60,12 @@ const NAV_ITEMS: NavItem[] = [
         label: "Users",
         href: "/manage/users",
         icon: <IconUsers size={20} />,
+        roles: ["dept_admin", "super_admin"],
+    },
+    {
+        label: "Registrations",
+        href: "/manage/registrations",
+        icon: <IconClipboardList size={20} />,
         roles: ["dept_admin", "super_admin"],
     },
     {

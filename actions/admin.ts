@@ -397,3 +397,53 @@ export async function getAnalytics() {
         }),
     };
 }
+
+export async function getAllRegistrationsAdmin(options: {
+    page?: number;
+    limit?: number;
+    status?: string;
+    paymentStatus?: string;
+    search?: string;
+    eventId?: string;
+} = {}) {
+    await requireManagement();
+    await connectDB();
+
+    const { page = 1, limit = 50, status, paymentStatus, search, eventId } = options;
+    const skip = (page - 1) * limit;
+
+    const filter: Record<string, any> = {};
+    if (status && status !== "all") filter.status = status;
+    if (paymentStatus && paymentStatus !== "all") filter.paymentStatus = paymentStatus;
+    if (eventId) filter.eventId = new (await import("mongoose")).default.Types.ObjectId(eventId);
+
+    let userIds: any[] | undefined;
+    if (search) {
+        const User = (await import("@/models")).User;
+        const regex = new RegExp(search, "i");
+        const users = await User.find({
+            $or: [{ name: regex }, { email: regex }, { collegeId: regex }],
+        }).select("_id").lean();
+        userIds = users.map((u: any) => u._id);
+        filter.userId = { $in: userIds };
+    }
+
+    const [registrations, total] = await Promise.all([
+        Registration.find(filter)
+            .populate("eventId", "title _id")
+            .populate("userId", "name email collegeId")
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit)
+            .lean(),
+        Registration.countDocuments(filter),
+    ]);
+
+    return {
+        success: true,
+        data: serialize(registrations),
+        total,
+        page,
+        totalPages: Math.ceil(total / limit),
+    };
+}

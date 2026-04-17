@@ -99,6 +99,7 @@ export default async function ManageAnalyticsPage() {
                                             <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wide">Event</th>
                                             <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wide">Status</th>
                                             <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wide">Payment</th>
+                                            <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wide">Transaction ID</th>
                                             <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wide">Registered</th>
                                         </tr>
                                     </thead>
@@ -133,6 +134,9 @@ export default async function ManageAnalyticsPage() {
                                                                     : "bg-red-50 text-red-600"
                                                     }`}>{reg.paymentStatus}</span>
                                                 </td>
+                                                <td className="px-4 py-3.5 text-xs text-zinc-500 font-mono">
+                                                    {reg.paymentId ?? "—"}
+                                                </td>
                                                 <td className="px-4 py-3.5 text-xs text-zinc-400">
                                                     {new Date(reg.createdAt).toLocaleDateString("en-IN", {
                                                         day: "numeric", month: "short", year: "numeric",
@@ -159,6 +163,7 @@ export default async function ManageAnalyticsPage() {
                                             <th className="text-left px-5 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wide">Participant</th>
                                             <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wide">Event</th>
                                             <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wide">Status</th>
+                                            <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wide">Transaction ID</th>
                                             <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wide">Registered</th>
                                         </tr>
                                     </thead>
@@ -177,6 +182,9 @@ export default async function ManageAnalyticsPage() {
                                                             : reg.status === "pending" ? "bg-yellow-50 text-yellow-700"
                                                                 : "bg-red-50 text-red-600"
                                                         }`}>{reg.status}</span>
+                                                </td>
+                                                <td className="px-4 py-3.5 text-xs text-zinc-500 font-mono">
+                                                    {reg.paymentId ?? "—"}
                                                 </td>
                                                 <td className="px-4 py-3.5 text-xs text-zinc-400">
                                                     {new Date(reg.createdAt).toLocaleDateString("en-IN", {
