@@ -175,6 +175,8 @@ export interface IEvent {
     whatsappLink?: string;
     /** If set, the Register button links here instead of the internal registration flow */
     externalRegistrationUrl?: string;
+    /** Markdown shown at the top of the registration form — useful for multi-step instructions */
+    registrationInstructions?: string;
     /** Optional time slots; when present, registrations must pick a slot */
     slots?: IEventSlot[];
     /** Sequential rounds (e.g. prelims, semi-finals, finals) — informational only */

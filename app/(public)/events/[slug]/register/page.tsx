@@ -18,6 +18,7 @@ import {
     IconCreditCard, IconRefresh,
 } from "@tabler/icons-react";
 import type { IEvent, IFormResponse, IEventSlot } from "@/types";
+import MDPreview from "@uiw/react-markdown-preview";
 
 // ─── Load Cashfree SDK ─────────────────────────────────────────────────────────
 
@@ -259,6 +260,11 @@ function FormStep({
                 <h2 className="text-lg font-semibold text-zinc-900">Additional Details</h2>
                 <p className="text-sm text-zinc-500 mt-1">Please fill in the registration form below.</p>
             </div>
+            {(event as any).registrationInstructions && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-900 [&_a]:underline [&_a]:text-amber-700 [&_strong]:font-semibold [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_code]:bg-amber-100 [&_code]:px-1 [&_code]:rounded">
+                    <MDPreview source={(event as any).registrationInstructions} style={{ background: "transparent", color: "inherit", fontSize: "inherit" }} />
+                </div>
+            )}
             <div className="space-y-4">
                 {event.customForm.map((field) => (
                     <div key={field._id}>

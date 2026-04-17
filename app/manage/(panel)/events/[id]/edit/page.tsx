@@ -291,6 +291,7 @@ export default function EditEventPage() {
     const [googleSheetId, setGoogleSheetId] = useState("");
     const [whatsappLink, setWhatsappLink] = useState("");
     const [externalRegistrationUrl, setExternalRegistrationUrl] = useState("");
+    const [registrationInstructions, setRegistrationInstructions] = useState("");
     const [expanded, setExpanded] = useState({
         basic: true, details: true, rules: false, team: false, form: false, slots: false, rounds: false,
     });
@@ -318,6 +319,7 @@ export default function EditEventPage() {
                 setGoogleSheetId(found.googleSheetId ?? "");
                 setWhatsappLink((found as any).whatsappLink ?? "");
                 setExternalRegistrationUrl((found as any).externalRegistrationUrl ?? "");
+                setRegistrationInstructions((found as any).registrationInstructions ?? "");
                 setRules(found.rules ?? "");
                 setSelectedDeptId(
                     typeof found.department === "string"
@@ -430,6 +432,7 @@ export default function EditEventPage() {
         formData.set("googleSheetId", googleSheetId.trim());
         formData.set("whatsappLink", whatsappLink.trim());
         formData.set("externalRegistrationUrl", externalRegistrationUrl.trim());
+        formData.set("registrationInstructions", registrationInstructions.trim());
 
         // Pass current Cloudinary URL (or empty string to signal removal)
         formData.set("coverImage", coverImageUrl ?? "");
@@ -842,7 +845,20 @@ export default function EditEventPage() {
                 <div className="bg-white rounded-xl border border-zinc-200 px-5">
                     <SectionHeader title="Registration Form" sectionKey="form" />
                     {expanded.form && (
-                        <div className="pb-5 space-y-3">
+                        <div className="pb-5 space-y-4">
+                            <div>
+                                <Label>Registration Instructions <span className="text-zinc-400 font-normal">(optional)</span></Label>
+                                <p className="text-xs text-zinc-400 mt-0.5 mb-1.5">Shown at the top of the registration form. Supports Markdown — great for multi-step instructions (e.g. "Register on Devfolio first, then enter your project ID below").</p>
+                                <div data-color-mode="light">
+                                    <MDEditor
+                                        value={registrationInstructions}
+                                        onChange={(val) => setRegistrationInstructions(val ?? "")}
+                                        height={180}
+                                        preview="edit"
+                                    />
+                                </div>
+                            </div>
+                            <div className="border-t border-zinc-100 pt-3 space-y-3">
                             {formFields.map((field, index) => (
                                 <FormFieldRow
                                     key={field._id}
@@ -860,6 +876,7 @@ export default function EditEventPage() {
                                 <IconPlus size={16} />
                                 Add Field
                             </button>
+                            </div>
                         </div>
                     )}
                 </div>

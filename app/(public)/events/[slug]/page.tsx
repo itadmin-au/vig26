@@ -33,40 +33,6 @@ function CategoryBadge({ category }: { category: string }) {
     );
 }
 
-function FormFieldPreview({ field }: { field: any }) {
-    return (
-        <div className="space-y-1.5">
-            <label className="text-sm font-medium text-zinc-800">
-                {field.label}
-                {field.isRequired && <span className="text-red-500 ml-1">*</span>}
-            </label>
-            {field.type === "long_text" ? (
-                <textarea
-                    disabled
-                    rows={3}
-                    placeholder={field.placeholder ?? ""}
-                    className="w-full text-sm border border-zinc-200 rounded-lg px-3 py-2 bg-zinc-50 text-zinc-400 resize-none cursor-not-allowed"
-                />
-            ) : field.type === "dropdown" ? (
-                <select disabled className="w-full text-sm border border-zinc-200 rounded-lg px-3 py-2 bg-zinc-50 text-zinc-400 cursor-not-allowed h-9">
-                    <option>Select an option…</option>
-                    {field.options?.map((o: string, i: number) => <option key={i}>{o}</option>)}
-                </select>
-            ) : field.type === "file_upload" ? (
-                <div className="border border-dashed border-zinc-200 rounded-lg px-4 py-3 text-sm text-zinc-400 bg-zinc-50 cursor-not-allowed">
-                    Click to upload a file
-                </div>
-            ) : (
-                <input
-                    disabled
-                    type="text"
-                    placeholder={field.placeholder ?? ""}
-                    className="w-full text-sm border border-zinc-200 rounded-lg px-3 py-2 bg-zinc-50 text-zinc-400 h-9 cursor-not-allowed"
-                />
-            )}
-        </div>
-    );
-}
 
 export default function EventDetailPage() {
     const { slug } = useParams<{ slug: string }>();
@@ -318,19 +284,6 @@ export default function EventDetailPage() {
                             </div>
                         )}
 
-                        {event.customForm?.length > 0 && (
-                            <div className="bg-white rounded-2xl border border-zinc-200 p-5">
-                                <div className="flex items-center gap-2 mb-4">
-                                    <h2 className="text-sm font-semibold text-zinc-900">Registration Form</h2>
-                                    <span className="text-xs text-zinc-400 bg-zinc-100 px-2 py-0.5 rounded-full">Preview — read only</span>
-                                </div>
-                                <div className="space-y-4 pointer-events-none">
-                                    {event.customForm.map((field) => (
-                                        <FormFieldPreview key={field._id} field={field} />
-                                    ))}
-                                </div>
-                            </div>
-                        )}
                     </div>
 
                     {/* Sidebar */}
@@ -418,6 +371,10 @@ export default function EventDetailPage() {
                             ) : isFull ? (
                                 <button disabled className="w-full py-2.5 bg-zinc-100 text-zinc-400 text-sm font-semibold rounded-xl cursor-not-allowed">
                                     Fully Booked
+                                </button>
+                            ) : event.registrationsClosed ? (
+                                <button disabled className="w-full py-2.5 bg-zinc-100 text-zinc-400 text-sm font-semibold rounded-xl cursor-not-allowed">
+                                    Registrations Closed
                                 </button>
                             ) : isRegistered ? (
                                 <Link

@@ -203,6 +203,7 @@ export async function createEvent(formData: FormData) {
 
     const whatsappLinkCreate = (raw.whatsappLink as string | undefined)?.trim() || undefined;
     const externalRegistrationUrlCreate = (raw.externalRegistrationUrl as string | undefined)?.trim() || undefined;
+    const registrationInstructionsCreate = (raw.registrationInstructions as string | undefined)?.trim() || undefined;
 
     const event = await Event.create({
         ...rest,
@@ -214,6 +215,7 @@ export async function createEvent(formData: FormData) {
             : {}),
         whatsappLink: whatsappLinkCreate,
         externalRegistrationUrl: externalRegistrationUrlCreate,
+        registrationInstructions: registrationInstructionsCreate,
         slots: slots.map((s) => ({
             label: s.label || undefined,
             start: new Date(s.start),
@@ -368,6 +370,11 @@ export async function updateEvent(id: string, formData: FormData) {
     // External registration URL — bypasses the internal registration flow
     if ("externalRegistrationUrl" in raw) {
         updates.externalRegistrationUrl = (raw.externalRegistrationUrl as string | undefined)?.trim() || null;
+    }
+
+    // Markdown instructions shown at the top of the registration form
+    if ("registrationInstructions" in raw) {
+        updates.registrationInstructions = (raw.registrationInstructions as string | undefined)?.trim() || null;
     }
 
     const updated = await Event.findByIdAndUpdate(id, updates, {
