@@ -1,11 +1,12 @@
 // app/api/events/[id]/sheet/route.ts
-// POST   — creates a new Google Sheet for this event in the admin's Drive.
-// DELETE — unlinks the sheet from the event (does not delete the sheet itself).
+// POST   — ensures the event's category has a spreadsheet, adds an event tab,
+//          backfills existing confirmed registrations, then links both to the DB.
+// DELETE — unlinks the sheet tab from the event (does not delete the spreadsheet).
 
 import { connectDB } from "@/lib/db";
-import { Event, Registration, User } from "@/models";
+import { Category, Event, Registration, User } from "@/models";
 import { requireAuth, unauthorizedResponse } from "@/lib/auth-helpers";
-import { createEventSheet, syncAllRegistrationsToSheet } from "@/lib/sheets";
+import { createCategorySpreadsheet, createEventTab, syncAllRegistrationsToSheet } from "@/lib/sheets";
 
 export async function POST(
     _req: Request,
@@ -21,7 +22,6 @@ export async function POST(
             return Response.json({ error: "Event not found" }, { status: 404 });
         }
 
-        // Fetch the admin's stored refresh token
         const user = await User.findById(session.user.id).select("+googleSheetsRefreshToken");
         if (!user?.googleSheetsRefreshToken) {
             return Response.json(
@@ -30,18 +30,42 @@ export async function POST(
             );
         }
 
+        const refreshToken: string = user.googleSheetsRefreshToken;
+
+        // ── Ensure the category has a spreadsheet ─────────────────────────────
+        const category = await Category.findOne({ slug: event.category });
+        if (!category) {
+            return Response.json({ error: "Event category not found" }, { status: 404 });
+        }
+
+        let spreadsheetId: string = (category as any).googleSheetId ?? "";
+
+        if (!spreadsheetId) {
+            spreadsheetId = await createCategorySpreadsheet(category.name, refreshToken);
+            await Category.findByIdAndUpdate(category._id, {
+                googleSheetId: spreadsheetId,
+                sheetOwner: session.user.id,
+            });
+        }
+
+        // ── Create a tab for this event ───────────────────────────────────────
         const maxMembers = event.isTeamEvent ? (event.teamSize?.max ?? 0) : 0;
-        const sheetId = await createEventSheet(
-            event.title,
+        const type: string = (event as any).type ?? "";
+        const tabTitle = type
+            ? `${event.title} (${type.charAt(0).toUpperCase() + type.slice(1)})`
+            : event.title;
+        const sheetTabName = await createEventTab(
+            spreadsheetId,
+            tabTitle,
             event.customForm,
-            user.googleSheetsRefreshToken,
+            refreshToken,
             maxMembers
         );
 
-        // Store sheetId on the event so the webhook knows where to append
-        await Event.findByIdAndUpdate(id, { googleSheetId: sheetId });
+        // Persist spreadsheetId and tab name on the event
+        await Event.findByIdAndUpdate(id, { googleSheetId: spreadsheetId, sheetTabName });
 
-        // Backfill all existing confirmed registrations
+        // ── Backfill existing confirmed registrations ─────────────────────────
         const existingRegs = await Registration.find({
             eventId: id,
             paymentStatus: { $in: ["completed", "na"] },
@@ -52,17 +76,19 @@ export async function POST(
 
         if (existingRegs.length > 0) {
             await syncAllRegistrationsToSheet(
-                sheetId,
+                spreadsheetId,
+                sheetTabName,
                 event,
                 existingRegs,
-                user.googleSheetsRefreshToken
+                refreshToken
             );
         }
 
         return Response.json({
             success: true,
-            sheetId,
-            sheetUrl: `https://docs.google.com/spreadsheets/d/${sheetId}`,
+            sheetId: spreadsheetId,
+            sheetTabName,
+            sheetUrl: `https://docs.google.com/spreadsheets/d/${spreadsheetId}`,
         });
     } catch (err: any) {
         if (err.message === "UNAUTHORIZED") return unauthorizedResponse();
@@ -79,7 +105,7 @@ export async function DELETE(
         const { id } = await params;
         await requireAuth();
         await connectDB();
-        await Event.findByIdAndUpdate(id, { googleSheetId: null });
+        await Event.findByIdAndUpdate(id, { googleSheetId: null, sheetTabName: null });
         return Response.json({ success: true });
     } catch (err: any) {
         if (err.message === "UNAUTHORIZED") return unauthorizedResponse();

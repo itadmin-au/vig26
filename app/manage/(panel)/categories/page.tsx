@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { getCategories, createCategory, deleteCategory, renameCategory } from "@/actions/events";
 import { toast } from "sonner";
-import { IconPlus, IconTrash, IconTag, IconLock, IconPencil, IconCheck, IconX } from "@tabler/icons-react";
+import { IconPlus, IconTrash, IconTag, IconLock, IconPencil, IconCheck, IconX, IconTableFilled, IconExternalLink } from "@tabler/icons-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
@@ -21,6 +21,9 @@ export default function ManageCategoriesPage() {
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editName, setEditName] = useState("");
     const [savingId, setSavingId] = useState<string | null>(null);
+    const [sheetsConnected, setSheetsConnected] = useState<boolean | null>(null);
+    const [bulkCreating, setBulkCreating] = useState(false);
+    const [bulkResult, setBulkResult] = useState<{ created: number; total: number; errors?: string[] } | null>(null);
 
     async function load() {
         setLoading(true);
@@ -30,6 +33,37 @@ export default function ManageCategoriesPage() {
     }
 
     useEffect(() => { load(); }, []);
+
+    useEffect(() => {
+        fetch("/api/auth/google-sheets/status")
+            .then((r) => r.json())
+            .then((d) => setSheetsConnected(d.connected ?? false))
+            .catch(() => setSheetsConnected(false));
+    }, []);
+
+    async function handleBulkCreateSheets() {
+        setBulkResult(null);
+        setBulkCreating(true);
+        try {
+            const res = await fetch("/api/events/bulk-sheets", { method: "POST" });
+            const json = await res.json();
+            if (!res.ok || !json.success) {
+                toast.error(json.error ?? "Failed to create sheets.");
+            } else {
+                setBulkResult({ created: json.created, total: json.total, errors: json.errors });
+                if (json.created > 0) {
+                    toast.success(`Created sheets for ${json.created} event${json.created !== 1 ? "s" : ""}.`);
+                } else {
+                    toast.info(json.message ?? "No new sheets to create.");
+                }
+                load(); // refresh to show updated googleSheetId on categories
+            }
+        } catch {
+            toast.error("Network error. Please try again.");
+        } finally {
+            setBulkCreating(false);
+        }
+    }
 
     async function handleCreate(e: React.FormEvent) {
         e.preventDefault();
@@ -119,7 +153,19 @@ export default function ManageCategoriesPage() {
                 ) : (
                     <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-zinc-900 capitalize">{cat.name}</p>
-                        <p className="text-xs text-zinc-400 font-mono">{cat.slug}</p>
+                        <div className="flex items-center gap-2">
+                            <p className="text-xs text-zinc-400 font-mono">{cat.slug}</p>
+                            {cat.googleSheetId && (
+                                <a
+                                    href={`https://docs.google.com/spreadsheets/d/${cat.googleSheetId}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-xs text-green-600 hover:underline flex items-center gap-0.5"
+                                >
+                                    Sheet <IconExternalLink size={10} />
+                                </a>
+                            )}
+                        </div>
                     </div>
                 )}
                 {!isEditing && (
@@ -168,6 +214,54 @@ export default function ManageCategoriesPage() {
                 <p className="text-sm text-zinc-500 mt-0.5">
                     Manage event categories.{!isSuperAdmin && " Default categories cannot be deleted."}
                 </p>
+            </div>
+
+            {/* Bulk Google Sheets */}
+            <div className="bg-white rounded-xl border border-zinc-200 p-5">
+                <div className="flex items-start justify-between gap-4">
+                    <div>
+                        <h2 className="text-sm font-semibold text-zinc-900 flex items-center gap-2">
+                            <IconTableFilled size={15} className="text-green-600" />
+                            Google Sheets
+                        </h2>
+                        <p className="text-xs text-zinc-500 mt-1">
+                            Creates one spreadsheet per category with a tab for each published event.
+                            Existing sheets are reused — only missing tabs are added.
+                        </p>
+                        {bulkResult && (
+                            <div className="mt-2 text-xs text-zinc-600">
+                                {bulkResult.created > 0
+                                    ? <span className="text-green-700 font-medium">✓ Created {bulkResult.created} of {bulkResult.total} sheets.</span>
+                                    : <span>All published events already have sheets.</span>
+                                }
+                                {bulkResult.errors && bulkResult.errors.length > 0 && (
+                                    <ul className="mt-1 text-red-500 space-y-0.5">
+                                        {bulkResult.errors.map((e, i) => <li key={i}>• {e}</li>)}
+                                    </ul>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                        {sheetsConnected === false && (
+                            <a
+                                href="/api/auth/google-sheets/connect"
+                                className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                            >
+                                Connect Google <IconExternalLink size={11} />
+                            </a>
+                        )}
+                        <Button
+                            onClick={handleBulkCreateSheets}
+                            disabled={bulkCreating || sheetsConnected === false}
+                            className="bg-green-700 hover:bg-green-800 text-white text-xs h-8 px-3"
+                            title={sheetsConnected === false ? "Connect your Google account first" : undefined}
+                        >
+                            <IconTableFilled size={14} className="mr-1.5" />
+                            {bulkCreating ? "Creating…" : "Create All Sheets"}
+                        </Button>
+                    </div>
+                </div>
             </div>
 
             {/* Add Category */}

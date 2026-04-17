@@ -28,6 +28,15 @@ const CategorySchema = new Schema<ICategoryDocument>(
             ref: "User",
             default: null,
         },
+        googleSheetId: {
+            type: String,
+            default: null,
+        },
+        sheetOwner: {
+            type: Schema.Types.ObjectId,
+            ref: "User",
+            default: null,
+        },
     },
     {
         timestamps: { createdAt: true, updatedAt: false },

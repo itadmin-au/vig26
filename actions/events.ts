@@ -613,15 +613,11 @@ export async function createAndLinkSheet(eventId: string) {
     const event = await Event.findById(eventId).lean();
     if (!event) return { success: false, error: "Event not found." };
 
-    const { createEventSheet } = await import("@/lib/sheets");
-    const sheetId = await createEventSheet(
-        (event as any).title,
-        (event as any).customForm ?? []
-    );
-
-    await Event.findByIdAndUpdate(eventId, { googleSheetId: sheetId });
-
-    return { success: true, sheetId };
+    // Prefer the API route (/api/events/[id]/sheet POST) which handles
+    // category-level spreadsheet creation with the user's refresh token.
+    // This server action is kept for backward compat but returns an error
+    // prompting use of the API route.
+    return { success: false, error: "Use the event management page to create or link a Google Sheet." };
 }
 
 export async function syncEventToSheet(eventId: string) {
@@ -632,14 +628,15 @@ export async function syncEventToSheet(eventId: string) {
     if (!event) return { success: false, error: "Event not found." };
 
     const googleSheetId = (event as any).googleSheetId as string | null;
-    if (!googleSheetId) return { success: false, error: "No Google Sheet linked to this event." };
+    const sheetTabName = (event as any).sheetTabName as string | null;
+    if (!googleSheetId || !sheetTabName) return { success: false, error: "No Google Sheet linked to this event." };
 
     const registrations = await Registration.find({ eventId, status: "confirmed" })
         .populate("userId", "name email collegeId")
         .lean();
 
     const { syncAllRegistrationsToSheet } = await import("@/lib/sheets");
-    await syncAllRegistrationsToSheet(googleSheetId, serialize(event) as IEvent, registrations);
+    await syncAllRegistrationsToSheet(googleSheetId, sheetTabName, serialize(event) as IEvent, registrations);
 
     return { success: true, count: registrations.length };
 }

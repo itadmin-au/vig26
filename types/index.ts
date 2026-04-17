@@ -133,6 +133,10 @@ export interface ICategory {
     isDefault: boolean;
     /** Only set for custom categories */
     createdBy?: Types.ObjectId | string;
+    /** Shared Google Spreadsheet ID for all events in this category */
+    googleSheetId?: string;
+    /** User who created the category spreadsheet (for refresh token lookup) */
+    sheetOwner?: Types.ObjectId | string;
     createdAt: Date;
 }
 
@@ -167,8 +171,10 @@ export interface IEvent {
     registrationCount: number;
     /** When true, new registrations are blocked even if event is published */
     registrationsClosed: boolean;
-    /** Google Sheets spreadsheet ID for live registration sync */
+    /** Google Sheets spreadsheet ID (shared across all events in the same category) */
     googleSheetId?: string;
+    /** Tab name within the category spreadsheet for this event */
+    sheetTabName?: string;
     /** Secret token for the public CSV feed URL */
     csvToken?: string;
     /** WhatsApp group/channel invite link shown after registration */

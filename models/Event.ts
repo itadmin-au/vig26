@@ -146,6 +146,10 @@ const EventSchema = new Schema<IEventDocument>(
       type: String,
       default: null,
     },
+    sheetTabName: {
+      type: String,
+      default: null,
+    },
     whatsappLink: {
       type: String,
       default: null,

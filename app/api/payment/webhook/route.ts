@@ -195,10 +195,8 @@ async function confirmPayment(orderId: string, paidAmount: number, provider: str
         // Increment registrationCount now that the registration is confirmed
         await Event.findByIdAndUpdate(updated.eventId, { $inc: { registrationCount: 1 } });
 
-        if ((event as any)?.googleSheetId) {
+        if ((event as any)?.googleSheetId && (event as any)?.sheetTabName) {
             try {
-                // Resolve the event creator's Google Sheets refresh token so we
-                // use their Drive credentials instead of the global env token.
                 let sheetsRefreshToken: string | undefined;
                 if ((event as any).createdBy) {
                     const creator = await User.findById((event as any).createdBy)
@@ -215,6 +213,7 @@ async function confirmPayment(orderId: string, paidAmount: number, provider: str
                 await Promise.race([
                     appendRegistrationRow(
                         (event as any).googleSheetId,
+                        (event as any).sheetTabName,
                         event as any,
                         populatedReg,
                         sheetsRefreshToken

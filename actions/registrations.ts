@@ -80,6 +80,37 @@ export async function createRegistration(input: unknown) {
                 { arrayFilters: [{ "slot._id": slotId }] }
             );
         }
+
+        // Sync to Google Sheets immediately for free events
+        if ((event as any).googleSheetId && (event as any).sheetTabName) {
+            try {
+                const creator = await User.findById(event.createdBy)
+                    .select("+googleSheetsRefreshToken")
+                    .lean();
+                const refreshToken = (creator as any)?.googleSheetsRefreshToken as string | undefined;
+
+                const populatedReg = await Registration.findById(registration._id)
+                    .populate("userId", "name email collegeId")
+                    .populate("teamMembers.userId", "name email collegeId")
+                    .lean();
+
+                const { appendRegistrationRow } = await import("@/lib/sheets");
+                await Promise.race([
+                    appendRegistrationRow(
+                        (event as any).googleSheetId,
+                        (event as any).sheetTabName,
+                        event as any,
+                        populatedReg,
+                        refreshToken
+                    ),
+                    new Promise<never>((_, reject) =>
+                        setTimeout(() => reject(new Error("Sheet sync timeout")), 8000)
+                    ),
+                ]);
+            } catch (sheetErr: any) {
+                console.error("[createRegistration] Sheet sync failed (non-fatal):", sheetErr?.message);
+            }
+        }
     }
 
     const tickets: ITicket[] = [];
