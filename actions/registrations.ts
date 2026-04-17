@@ -84,7 +84,11 @@ export async function createRegistration(input: unknown) {
         // Sync to Google Sheets immediately for free events
         if ((event as any).googleSheetId && (event as any).sheetTabName) {
             try {
-                const creator = await User.findById(event.createdBy)
+                // Use the category sheet owner's token (the account that owns the spreadsheet)
+                const { Category } = await import("@/models");
+                const cat = await Category.findOne({ slug: (event as any).category }).lean();
+                const tokenHolder = (cat as any)?.sheetOwner ?? event.createdBy;
+                const creator = await User.findById(tokenHolder)
                     .select("+googleSheetsRefreshToken")
                     .lean();
                 const refreshToken = (creator as any)?.googleSheetsRefreshToken as string | undefined;

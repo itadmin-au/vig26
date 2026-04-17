@@ -6,7 +6,7 @@
 import { connectDB } from "@/lib/db";
 import { Category, Event, Registration, User } from "@/models";
 import { requireAuth, unauthorizedResponse } from "@/lib/auth-helpers";
-import { createCategorySpreadsheet, createEventTab, syncAllRegistrationsToSheet } from "@/lib/sheets";
+import { createCategorySpreadsheet, createEventTab, syncAllRegistrationsToSheet, syncCategoryEventsSheet } from "@/lib/sheets";
 
 export async function POST(
     _req: Request,
@@ -83,6 +83,11 @@ export async function POST(
                 refreshToken
             );
         }
+
+        // Update the Events Overview tab for this category
+        const allCategoryEvents = await Event.find({ category: event.category })
+            .populate("department", "name").lean();
+        await syncCategoryEventsSheet(spreadsheetId, allCategoryEvents, refreshToken).catch(() => {});
 
         return Response.json({
             success: true,

@@ -2,7 +2,7 @@
 "use server";
 
 import { connectDB } from "@/lib/db";
-import { Event, Category, Registration, Ticket, EventAuditLog } from "@/models";
+import { Event, Category, Registration, Ticket, EventAuditLog, User } from "@/models";
 import { requireManagement, requireDepartmentAccess, requireSuperAdmin } from "@/lib/auth-helpers";
 import type { Session } from "next-auth";
 import { createEventSchema, updateEventSchema, eventSlotSchema, eventRoundSchema } from "@/lib/validations";
@@ -28,6 +28,88 @@ async function logAudit(
         });
     } catch {
         // Audit failures must never break the main operation
+    }
+}
+
+async function autoCreateEventSheet(eventId: string, categorySlug: string, userId: string) {
+    try {
+        const { createCategorySpreadsheet, createEventTab, syncCategoryEventsSheet } = await import("@/lib/sheets");
+
+        // Resolve the refresh token: prefer category sheet owner, fall back to current user
+        let refreshToken: string | undefined;
+        const category = await Category.findOne({ slug: categorySlug });
+        if (!category) return;
+
+        if ((category as any).sheetOwner) {
+            const owner = await User.findById((category as any).sheetOwner)
+                .select("+googleSheetsRefreshToken").lean();
+            refreshToken = (owner as any)?.googleSheetsRefreshToken ?? undefined;
+        }
+        if (!refreshToken) {
+            const currentUser = await User.findById(userId)
+                .select("+googleSheetsRefreshToken").lean();
+            refreshToken = (currentUser as any)?.googleSheetsRefreshToken ?? undefined;
+        }
+        if (!refreshToken) return;
+
+        // Ensure the category has a spreadsheet
+        let spreadsheetId: string = (category as any).googleSheetId ?? "";
+        if (!spreadsheetId) {
+            spreadsheetId = await createCategorySpreadsheet(category.name, refreshToken);
+            await Category.findByIdAndUpdate(category._id, {
+                googleSheetId: spreadsheetId,
+                sheetOwner: userId,
+            });
+        }
+
+        // Build the tab title (e.g. "Event Name (Inter)")
+        const event = await Event.findById(eventId).lean();
+        if (!event) return;
+        const type: string = (event as any).type ?? "";
+        const tabTitle = type
+            ? `${(event as any).title} (${type.charAt(0).toUpperCase() + type.slice(1)})`
+            : (event as any).title;
+
+        const sheetTabName = await createEventTab(
+            spreadsheetId,
+            tabTitle,
+            (event as any).customForm ?? [],
+            refreshToken,
+            (event as any).isTeamEvent ? ((event as any).teamSize?.max ?? 0) : 0
+        );
+
+        await Event.findByIdAndUpdate(eventId, { googleSheetId: spreadsheetId, sheetTabName });
+
+        // Sync the category overview
+        const allCatEvents = await Event.find({ category: categorySlug })
+            .populate("department", "name").lean();
+        await syncCategoryEventsSheet(spreadsheetId, allCatEvents, refreshToken);
+    } catch (err) {
+        console.error(`[autoCreateEventSheet] event="${eventId}":`, err);
+    }
+}
+
+async function syncCategoryOverviewSheet(categorySlug: string) {
+    try {
+        const category = await Category.findOne({ slug: categorySlug }).lean();
+        if (!category || !(category as any).googleSheetId) return;
+
+        const owner = await User.findById((category as any).sheetOwner)
+            .select("+googleSheetsRefreshToken").lean();
+        if (!(owner as any)?.googleSheetsRefreshToken) return;
+
+        const events = await Event.find({ category: categorySlug })
+            .populate("department", "name")
+            .lean();
+
+        const { syncCategoryEventsSheet } = await import("@/lib/sheets");
+        await syncCategoryEventsSheet(
+            (category as any).googleSheetId,
+            events,
+            (owner as any).googleSheetsRefreshToken
+        );
+    } catch (err) {
+        console.error(`[syncCategoryOverviewSheet] category="${categorySlug}":`, err);
     }
 }
 
@@ -319,6 +401,7 @@ export async function createEvent(formData: FormData) {
     });
 
     await logAudit(event._id.toString(), session, "create", `Created event "${event.title}"`);
+    void autoCreateEventSheet(event._id.toString(), event.category, session.user.id);
 
     return { success: true, data: serialize(event) };
 }
@@ -470,6 +553,7 @@ export async function updateEvent(id: string, formData: FormData) {
     }).lean();
 
     await logAudit(id, session, "update", buildUpdateSummary(event, updates));
+    void syncCategoryOverviewSheet(event.category);
 
     return { success: true, data: serialize(updated) };
 }
@@ -488,6 +572,7 @@ export async function cancelEvent(id: string) {
 
     await Event.findByIdAndUpdate(id, { status: "cancelled" });
     await logAudit(id, session, "cancel", `Cancelled event "${event.title}"`);
+    void syncCategoryOverviewSheet(event.category);
 
     return { success: true };
 }
@@ -504,10 +589,12 @@ export async function deleteEvent(id: string) {
         return { success: false, error: "Cancel the event before deleting it." };
     }
 
+    const categorySlug = event.category;
     await logAudit(id, session, "delete", `Deleted event "${event.title}"`);
     await Ticket.deleteMany({ eventId: id });
     await Registration.deleteMany({ eventId: id });
     await Event.findByIdAndDelete(id);
+    void syncCategoryOverviewSheet(categorySlug);
 
     return { success: true };
 }
@@ -537,6 +624,7 @@ export async function publishEvent(id: string) {
 
     await Event.findByIdAndUpdate(id, { status: "published" });
     await logAudit(id, session, "publish", `Published event "${event.title}"`);
+    void syncCategoryOverviewSheet(event.category);
 
     return { success: true };
 }

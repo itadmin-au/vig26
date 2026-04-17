@@ -9,7 +9,7 @@
 //   Headers: signature  (and optionally x-jp-merchant-id)
 
 import { connectDB } from "@/lib/db";
-import { Event, Registration, User } from "@/models";
+import { Event, Registration, User, Category } from "@/models";
 import { verifyCashfreeWebhook } from "@/lib/cashfree";
 import { verifyHdfcWebhook, isHdfcPaid, isHdfcFailed } from "@/lib/hdfc";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
@@ -197,9 +197,12 @@ async function confirmPayment(orderId: string, paidAmount: number, provider: str
 
         if ((event as any)?.googleSheetId && (event as any)?.sheetTabName) {
             try {
+                // Use the category sheet owner's token (the account that owns the spreadsheet)
                 let sheetsRefreshToken: string | undefined;
-                if ((event as any).createdBy) {
-                    const creator = await User.findById((event as any).createdBy)
+                const cat = await Category.findOne({ slug: (event as any).category }).lean();
+                const tokenHolder = (cat as any)?.sheetOwner ?? (event as any).createdBy;
+                if (tokenHolder) {
+                    const creator = await User.findById(tokenHolder)
                         .select("+googleSheetsRefreshToken")
                         .lean();
                     sheetsRefreshToken = (creator as any)?.googleSheetsRefreshToken ?? undefined;

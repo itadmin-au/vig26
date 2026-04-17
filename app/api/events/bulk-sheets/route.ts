@@ -5,7 +5,7 @@
 import { connectDB } from "@/lib/db";
 import { Category, Event, Registration, User } from "@/models";
 import { requireAuth, unauthorizedResponse } from "@/lib/auth-helpers";
-import { createCategorySpreadsheet, createEventTab, syncAllRegistrationsToSheet } from "@/lib/sheets";
+import { createCategorySpreadsheet, createEventTab, syncAllRegistrationsToSheet, syncCategoryEventsSheet } from "@/lib/sheets";
 
 export async function POST(_req: Request) {
     try {
@@ -110,6 +110,20 @@ export async function POST(_req: Request) {
             } catch (err: any) {
                 console.error(`[bulk-sheets] Failed for event "${(event as any).title}":`, err?.message);
                 errors.push(`${(event as any).title}: ${err?.message ?? "unknown error"}`);
+            }
+        }
+
+        // Sync the Events Overview tab for each category that has a spreadsheet
+        const processedSlugs = [...new Set(Object.keys(categorySheetCache))];
+        for (const slug of processedSlugs) {
+            try {
+                const spreadsheetId = categorySheetCache[slug];
+                const allCatEvents = await Event.find({ category: slug })
+                    .populate("department", "name").lean();
+                await syncCategoryEventsSheet(spreadsheetId, allCatEvents, refreshToken);
+                await new Promise((r) => setTimeout(r, 1000));
+            } catch (err: any) {
+                console.error(`[bulk-sheets] Overview sync failed for "${slug}":`, err?.message);
             }
         }
 

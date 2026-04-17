@@ -1,7 +1,7 @@
 // app/api/payment/verify/route.ts
 import mongoose from "mongoose";
 import { connectDB } from "@/lib/db";
-import { Event, Registration, Ticket, User } from "@/models";
+import { Event, Registration, Ticket, User, Category } from "@/models";
 import { getCashfreeOrder } from "@/lib/cashfree";
 import { getHdfcOrderStatus, isHdfcPaid } from "@/lib/hdfc";
 import { requireAuth, unauthorizedResponse } from "@/lib/auth-helpers";
@@ -322,6 +322,39 @@ export async function POST(req: Request) {
 
         // Send emails after successful commit — failures are non-fatal
         await Promise.allSettled(emailTasks.map((fn) => fn()));
+
+        // Sync to Google Sheets — non-fatal
+        if ((event as any).googleSheetId && (event as any).sheetTabName) {
+            try {
+                const cat = await Category.findOne({ slug: (event as any).category }).lean();
+                const tokenHolder = (cat as any)?.sheetOwner ?? (event as any).createdBy;
+                const sheetUser = tokenHolder
+                    ? await User.findById(tokenHolder).select("+googleSheetsRefreshToken").lean()
+                    : null;
+                const refreshToken = (sheetUser as any)?.googleSheetsRefreshToken as string | undefined;
+
+                const populatedReg = await Registration.findById(registration._id)
+                    .populate("userId", "name email collegeId")
+                    .populate("teamMembers.userId", "name email collegeId")
+                    .lean();
+
+                const { appendRegistrationRow } = await import("@/lib/sheets");
+                await Promise.race([
+                    appendRegistrationRow(
+                        (event as any).googleSheetId,
+                        (event as any).sheetTabName,
+                        event as any,
+                        populatedReg,
+                        refreshToken
+                    ),
+                    new Promise<never>((_, reject) =>
+                        setTimeout(() => reject(new Error("Sheet sync timeout")), 8000)
+                    ),
+                ]);
+            } catch (sheetErr: any) {
+                console.error("[payment/verify] Sheet sync failed (non-fatal):", sheetErr?.message);
+            }
+        }
 
         return Response.json(
             {

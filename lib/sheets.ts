@@ -108,8 +108,7 @@ export async function createCategorySpreadsheet(
     const created = await sheets.spreadsheets.create({
         requestBody: {
             properties: { title: `Registrations — ${categoryName}` },
-            // Start with no sheets; tabs will be added per event
-            sheets: [],
+            sheets: [{ properties: { title: "Events Overview", index: 0 } }],
         },
     });
 
@@ -215,6 +214,72 @@ export async function appendRegistrationRow(
         range: buildRange(sheetTabName, "A1"),
         valueInputOption: "USER_ENTERED",
         insertDataOption: "INSERT_ROWS",
+        requestBody: { values: rows },
+    });
+}
+
+/**
+ * Writes/updates the "Events Overview" summary tab (first sheet) in a category spreadsheet.
+ * Creates the tab if it doesn't exist yet. Called whenever an event in the category changes.
+ */
+export async function syncCategoryEventsSheet(
+    spreadsheetId: string,
+    events: any[],
+    refreshToken?: string
+): Promise<void> {
+    const auth = getAuth(refreshToken);
+    const sheets = google.sheets({ version: "v4", auth });
+    const tabName = "Events Overview";
+
+    const meta = await sheets.spreadsheets.get({ spreadsheetId });
+    const existingTitles = (meta.data.sheets ?? []).map((s) => s.properties?.title ?? "");
+    if (!existingTitles.includes(tabName)) {
+        await sheets.spreadsheets.batchUpdate({
+            spreadsheetId,
+            requestBody: {
+                requests: [{ addSheet: { properties: { title: tabName, index: 0 } } }],
+            },
+        });
+    }
+
+    const headers = [
+        "Title", "Type", "Category", "Status", "Department",
+        "Date (Start)", "Date (End)", "Venue", "Price (₹)",
+        "Capacity", "Registrations", "Remaining Slots",
+    ];
+    const rows: string[][] = [headers];
+    for (const e of events) {
+        const dept = typeof e.department === "object"
+            ? (e.department?.name ?? "—")
+            : (e.department ?? "—");
+        const capacity = e.capacity === 0 ? "Unlimited" : String(e.capacity ?? 0);
+        const remaining = e.capacity === 0
+            ? "Unlimited"
+            : String(Math.max(0, (e.capacity ?? 0) - (e.registrationCount ?? 0)));
+        rows.push([
+            e.title ?? "",
+            e.type ?? "",
+            e.category ?? "",
+            e.status ?? "",
+            dept,
+            e.date?.start ? new Date(e.date.start).toLocaleString("en-IN") : "—",
+            e.date?.end ? new Date(e.date.end).toLocaleString("en-IN") : "—",
+            e.venue ?? "—",
+            e.price === 0 ? "Free" : String(e.price ?? "—"),
+            capacity,
+            String(e.registrationCount ?? 0),
+            remaining,
+        ]);
+    }
+
+    await sheets.spreadsheets.values.clear({
+        spreadsheetId,
+        range: buildRange(tabName, "A:L"),
+    });
+    await sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: buildRange(tabName, "A1"),
+        valueInputOption: "USER_ENTERED",
         requestBody: { values: rows },
     });
 }
