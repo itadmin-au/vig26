@@ -479,6 +479,21 @@ export async function updateEvent(id: string, formData: FormData) {
 
     const updates: Record<string, unknown> = { ...rest };
 
+    // Preserve existing _id on customForm subdocuments so registration formResponses stay linked.
+    // Zod passes _id through as a string; only accept valid 24-char hex ObjectIds.
+    if (raw.customForm !== undefined && Array.isArray(updates.customForm)) {
+        const isValidObjectId = (id: string) => /^[0-9a-f]{24}$/i.test(id);
+        updates.customForm = (updates.customForm as any[]).map((f) => ({
+            ...(f._id && isValidObjectId(f._id) ? { _id: f._id } : {}),
+            label: f.label,
+            type: f.type,
+            placeholder: f.placeholder,
+            isRequired: f.isRequired,
+            options: f.options,
+            order: f.order,
+        }));
+    }
+
     // Explicitly handle coverImage removal: if raw had coverImage key but it's empty, unset it
     if ("coverImage" in raw && !raw.coverImage) {
         updates.coverImage = null;

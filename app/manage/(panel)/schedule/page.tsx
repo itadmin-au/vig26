@@ -50,11 +50,24 @@ function formatDateLabel(key: string): string {
     });
 }
 
-function toMinutesFromMidnight(date: Date): number {
-    // IST = UTC+5:30; derive hours and minutes consistently in IST
-    const istMs = new Date(date).getTime() + (5 * 60 + 30) * 60 * 1000;
-    const istDate = new Date(istMs);
-    return istDate.getUTCHours() * 60 + istDate.getUTCMinutes();
+/** Minutes elapsed from the start of `dayKey` (IST midnight) to `date`. Can be negative or > 1440 for multi-day events. */
+function toMinutesFromDayStart(date: Date, dayKey: string): number {
+    const dayStartMs = new Date(dayKey + "T00:00:00+05:30").getTime();
+    return (new Date(date).getTime() - dayStartMs) / (60 * 1000);
+}
+
+/** All IST date keys (YYYY-MM-DD) that an event spans. */
+function spanningDayKeys(start: Date, end: Date): string[] {
+    const keys: string[] = [];
+    const startKey = toDateKey(start);
+    const endKey = toDateKey(end);
+    // Walk day by day from startKey to endKey
+    const cur = new Date(startKey + "T00:00:00+05:30");
+    while (toDateKey(cur) <= endKey) {
+        keys.push(toDateKey(cur));
+        cur.setDate(cur.getDate() + 1);
+    }
+    return keys;
 }
 
 function formatTime(date: Date): string {
@@ -110,17 +123,22 @@ function layoutRows(events: ScheduleEvent[]): ScheduleEvent[][] {
 
 function GanttBar({
     event,
+    dateKey,
     dayStartMin,
+    dayEndMin,
     totalMins,
     color,
 }: {
     event: ScheduleEvent;
+    dateKey: string;
     dayStartMin: number;
+    dayEndMin: number;
     totalMins: number;
     color: ReturnType<typeof deptColor>;
 }) {
-    const startMin = toMinutesFromMidnight(event.start);
-    const endMin = toMinutesFromMidnight(event.end);
+    // Clamp to the visible day range so multi-day bars don't overflow
+    const startMin = Math.max(toMinutesFromDayStart(event.start, dateKey), dayStartMin);
+    const endMin = Math.min(toMinutesFromDayStart(event.end, dateKey), dayEndMin);
     const left = ((startMin - dayStartMin) / totalMins) * 100;
     const width = Math.max(((endMin - startMin) / totalMins) * 100, 1.5);
 
@@ -160,8 +178,11 @@ function DayGantt({
     events: ScheduleEvent[];
     deptColorMap: Map<string, number>;
 }) {
-    // Compute time range for the day (rounded to nearest hour)
-    const allMins = events.flatMap((e) => [toMinutesFromMidnight(e.start), toMinutesFromMidnight(e.end)]);
+    // Compute time range for the day (rounded to nearest hour), clamped to 0–1440
+    const allMins = events.flatMap((e) => [
+        Math.max(toMinutesFromDayStart(e.start, dateKey), 0),
+        Math.min(toMinutesFromDayStart(e.end, dateKey), 24 * 60),
+    ]);
     const rawStart = Math.min(...allMins);
     const rawEnd = Math.max(...allMins);
     const dayStartMin = Math.max(0, Math.floor(rawStart / 60) * 60 - 30);
@@ -265,7 +286,9 @@ function DayGantt({
                                                 <GanttBar
                                                     key={ev._id}
                                                     event={ev}
+                                                    dateKey={dateKey}
                                                     dayStartMin={dayStartMin}
+                                                    dayEndMin={dayEndMin}
                                                     totalMins={totalMins}
                                                     color={deptColor(ev.deptId, deptColorMap)}
                                                 />
@@ -346,16 +369,16 @@ export default function SchedulePage() {
         });
     }, [events, statusFilter, deptFilter]);
 
-    // Group by date
+    // Group by date — multi-day events appear on every day they span
     const byDate = useMemo(() => {
         const map = new Map<string, ScheduleEvent[]>();
         for (const ev of filtered) {
-            const key = toDateKey(ev.start);
-            const arr = map.get(key) ?? [];
-            arr.push(ev);
-            map.set(key, arr);
+            for (const key of spanningDayKeys(ev.start, ev.end)) {
+                const arr = map.get(key) ?? [];
+                arr.push(ev);
+                map.set(key, arr);
+            }
         }
-        // Sort by date
         return new Map([...map.entries()].sort(([a], [b]) => a.localeCompare(b)));
     }, [filtered]);
 

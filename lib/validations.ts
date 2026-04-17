@@ -66,6 +66,7 @@ export const eventSlotSchema = z.object({
 });
 
 export const formFieldSchema = z.object({
+    _id: z.string().optional(),
     label: z.string().min(1, "Field label is required").trim(),
     type: z.enum(["short_text", "long_text", "dropdown", "checkbox", "file_upload"]),
     placeholder: z.string().trim().optional(),

@@ -495,6 +495,13 @@ export default function ManageEventDetailPage() {
                                 <p className="text-xs text-zinc-400">Date</p>
                                 <p className="text-sm font-medium text-zinc-900">
                                     {new Date(event.date.start).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                                {" "}
+                                {new Date(event.date.start).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}
+                                {event.date.end && (
+                                    <span className="text-zinc-400 text-xs block">
+                                        ends {new Date(event.date.end).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}
+                                    </span>
+                                )}
                                 </p>
                             </div>
                         </div>
