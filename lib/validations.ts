@@ -125,6 +125,7 @@ export const updateEventSchema = eventBaseSchema
 export const teamMemberSchema = z.object({
     name: z.string().min(2).trim(),
     email: z.string().email().toLowerCase().trim(),
+    usn: z.string().trim().optional(),
 });
 
 export const formResponseSchema = z.object({
@@ -135,6 +136,7 @@ export const formResponseSchema = z.object({
 export const createRegistrationSchema = z.object({
     eventId: z.string().min(1),
     slotId: z.string().optional(),
+    leaderUsn: z.string().trim().optional(),
     teamMembers: z.array(teamMemberSchema).default([]),
     formResponses: z.array(formResponseSchema).default([]),
 });

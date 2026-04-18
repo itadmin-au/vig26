@@ -155,11 +155,13 @@ function SlotStep({
 // ─── Step 1: Team ─────────────────────────────────────────────────────────────
 
 function TeamStep({
-    event, leaderName, setLeaderName, leaderEmail, members, setMembers, onNext,
+    event, leaderName, setLeaderName, leaderEmail, leaderUsn, setLeaderUsn,
+    members, setMembers, onNext,
 }: {
     event: IEvent; leaderName: string; setLeaderName: (v: string) => void;
-    leaderEmail: string; members: { name: string; email: string }[];
-    setMembers: (m: { name: string; email: string }[]) => void; onNext: () => void;
+    leaderEmail: string; leaderUsn: string; setLeaderUsn: (v: string) => void;
+    members: { name: string; email: string; usn: string }[];
+    setMembers: (m: { name: string; email: string; usn: string }[]) => void; onNext: () => void;
 }) {
     const totalMin = event.teamSize?.min ?? 2;
     const totalMax = event.teamSize?.max ?? 2;
@@ -206,6 +208,10 @@ function TeamStep({
                         <div><Label className="text-xs mb-1">Name</Label><Input value={leaderName} onChange={(e) => setLeaderName(e.target.value)} placeholder="Your name" className="h-9 bg-white" /></div>
                         <div><Label className="text-xs mb-1">Email</Label><Input type="email" value={leaderEmail} disabled className="h-9 bg-zinc-100 text-zinc-400 cursor-not-allowed" /></div>
                     </div>
+                    <div className="mt-3">
+                        <Label className="text-xs mb-1">USN / College ID <span className="text-zinc-400">(optional)</span></Label>
+                        <Input value={leaderUsn} onChange={(e) => setLeaderUsn(e.target.value)} placeholder="e.g. 1AT21CS045" className="h-9 bg-white" />
+                    </div>
                 </div>
                 {members.map((m, i) => (
                     <div key={i} className="bg-zinc-50 border border-zinc-200 rounded-xl p-4">
@@ -221,11 +227,15 @@ function TeamStep({
                             <div><Label className="text-xs mb-1">Name</Label><Input value={m.name} onChange={(e) => setMembers(members.map((x, idx) => idx === i ? { ...x, name: e.target.value } : x))} placeholder="Full name" className="h-9 bg-white" /></div>
                             <div><Label className="text-xs mb-1">Email</Label><Input type="email" value={m.email} onChange={(e) => setMembers(members.map((x, idx) => idx === i ? { ...x, email: e.target.value } : x))} placeholder="email@example.com" className="h-9 bg-white" /></div>
                         </div>
+                        <div className="mt-3">
+                            <Label className="text-xs mb-1">USN / College ID <span className="text-zinc-400">(optional)</span></Label>
+                            <Input value={m.usn} onChange={(e) => setMembers(members.map((x, idx) => idx === i ? { ...x, usn: e.target.value } : x))} placeholder="e.g. 1AT21CS045" className="h-9 bg-white" />
+                        </div>
                     </div>
                 ))}
             </div>
             {members.length < maxTeammates && (
-                <button type="button" onClick={() => setMembers([...members, { name: "", email: "" }])} className="flex items-center gap-2 w-full justify-center py-2.5 border-2 border-dashed border-zinc-200 rounded-xl text-sm text-zinc-500 hover:border-primary/40 hover:text-primary transition-colors">
+                <button type="button" onClick={() => setMembers([...members, { name: "", email: "", usn: "" }])} className="flex items-center gap-2 w-full justify-center py-2.5 border-2 border-dashed border-zinc-200 rounded-xl text-sm text-zinc-500 hover:border-primary/40 hover:text-primary transition-colors">
                     <IconPlus size={15} /> Add teammate ({members.length + 2} of {maxTeammates + 1} max)
                 </button>
             )}
@@ -300,12 +310,12 @@ function FormStep({
 // ─── Step 3: Review ────────────────────────────────────────────────────────────
 
 function ReviewStep({
-    event, leaderName, leaderEmail, members, responses,
+    event, leaderName, leaderEmail, leaderUsn, members, responses,
     selectedSlot, onBack, onSubmit, submitting, paymentError, onRetryPayment,
     provider,
 }: {
-    event: IEvent; leaderName: string; leaderEmail: string;
-    members: { name: string; email: string }[]; responses: Record<string, string>;
+    event: IEvent; leaderName: string; leaderEmail: string; leaderUsn: string;
+    members: { name: string; email: string; usn: string }[]; responses: Record<string, string>;
     selectedSlot?: IEventSlot;
     onBack: () => void; onSubmit: () => void; submitting: boolean;
     paymentError: string | null; onRetryPayment: () => void;
@@ -356,7 +366,10 @@ function ReviewStep({
                     <h3 className="text-sm font-semibold text-zinc-900 mb-3">Your Team ({members.length + 1} members)</h3>
                     <div className="space-y-2">
                         <div className="flex items-center justify-between text-sm">
-                            <span className="font-medium text-zinc-800">{leaderName || "You"}</span>
+                            <div>
+                                <span className="font-medium text-zinc-800">{leaderName || "You"}</span>
+                                {leaderUsn && <span className="ml-2 text-xs text-zinc-400">{leaderUsn}</span>}
+                            </div>
                             <div className="flex items-center gap-2">
                                 <span className="text-zinc-400 text-xs truncate max-w-40">{leaderEmail}</span>
                                 <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">Leader</span>
@@ -364,7 +377,10 @@ function ReviewStep({
                         </div>
                         {members.map((m, i) => (
                             <div key={i} className="flex items-center justify-between text-sm">
-                                <span className="font-medium text-zinc-800">{m.name}</span>
+                                <div>
+                                    <span className="font-medium text-zinc-800">{m.name}</span>
+                                    {m.usn && <span className="ml-2 text-xs text-zinc-400">{m.usn}</span>}
+                                </div>
                                 <span className="text-zinc-400 text-xs truncate max-w-45">{m.email}</span>
                             </div>
                         ))}
@@ -501,9 +517,10 @@ export default function RegisterPage() {
     const [paymentError, setPaymentError] = useState<string | null>(null);
     const provider = "hdfc" as const;
 
-    const [members, setMembers] = useState<{ name: string; email: string }[]>([]);
+    const [members, setMembers] = useState<{ name: string; email: string; usn: string }[]>([]);
     const [responses, setResponses] = useState<Record<string, string>>({});
     const [leaderName, setLeaderName] = useState("");
+    const [leaderUsn, setLeaderUsn] = useState("");
     const [selectedSlotId, setSelectedSlotId] = useState("");
 
     // Pre-load Cashfree SDK for paid events
@@ -522,7 +539,7 @@ export default function RegisterPage() {
             setEvent(data);
             setLeaderName(session?.user?.name ?? "");
             if (data.isTeamEvent && data.teamSize) {
-                setMembers(Array.from({ length: data.teamSize.min - 1 }, () => ({ name: "", email: "" })));
+                setMembers(Array.from({ length: data.teamSize.min - 1 }, () => ({ name: "", email: "", usn: "" })));
             }
             setLoading(false);
         });
@@ -544,6 +561,7 @@ export default function RegisterPage() {
         const result = await createRegistration({
             eventId: event._id.toString(),
             slotId: selectedSlotId || undefined,
+            leaderUsn: leaderUsn || undefined,
             teamMembers: event.isTeamEvent ? members : [],
             formResponses: buildFormResponses(),
         });
@@ -582,6 +600,7 @@ export default function RegisterPage() {
                 eventTitle: event.title,
                 whatsappLink: (event as any).whatsappLink || undefined,
                 slotId: selectedSlotId || undefined,
+                leaderUsn: leaderUsn || undefined,
                 teamMembers: teamMembersPayload,
                 formResponses,
             }));
@@ -629,6 +648,7 @@ export default function RegisterPage() {
                         provider: "cashfree",
                         eventId: event._id.toString(),
                         slotId: selectedSlotId || undefined,
+                        leaderUsn: leaderUsn || undefined,
                         teamMembers: teamMembersPayload,
                         formResponses,
                     }),
@@ -701,7 +721,7 @@ export default function RegisterPage() {
                                 if (hasSlots) idx++;
 
                                 if (isTeam && step === idx) return (
-                                    <TeamStep event={event} leaderName={leaderName} setLeaderName={setLeaderName} leaderEmail={session?.user?.email ?? ""} members={members} setMembers={setMembers} onNext={() => setStep(s => s + 1)} />
+                                    <TeamStep event={event} leaderName={leaderName} setLeaderName={setLeaderName} leaderEmail={session?.user?.email ?? ""} leaderUsn={leaderUsn} setLeaderUsn={setLeaderUsn} members={members} setMembers={setMembers} onNext={() => setStep(s => s + 1)} />
                                 );
                                 if (isTeam) idx++;
 
@@ -713,7 +733,7 @@ export default function RegisterPage() {
                                 const chosenSlot = event.slots?.find((s) => s._id === selectedSlotId);
                                 return (
                                     <ReviewStep
-                                        event={event} leaderName={leaderName} leaderEmail={session?.user?.email ?? ""}
+                                        event={event} leaderName={leaderName} leaderEmail={session?.user?.email ?? ""} leaderUsn={leaderUsn}
                                         members={members} responses={responses}
                                         selectedSlot={chosenSlot}
                                         onBack={() => { setPaymentError(null); setStep(s => s - 1); }}

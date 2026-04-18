@@ -19,7 +19,7 @@ export async function createRegistration(input: unknown) {
         return { success: false, error: parsed.error.issues[0].message };
     }
 
-    const { eventId, slotId, teamMembers, formResponses } = parsed.data;
+    const { eventId, slotId, leaderUsn, teamMembers, formResponses } = parsed.data;
 
     const event = await Event.findById(eventId);
     if (!event) return { success: false, error: "Event not found." };
@@ -57,6 +57,10 @@ export async function createRegistration(input: unknown) {
 
     const isTeam = event.isTeamEvent && teamMembers.length > 0;
     const teamId = isTeam ? generateTeamId() : undefined;
+
+    if (leaderUsn) {
+        await User.findByIdAndUpdate(session.user.id, { collegeId: leaderUsn.trim() });
+    }
 
     const registration = await Registration.create({
         eventId,
@@ -231,11 +235,169 @@ export async function getMyRegistrations(): Promise<IRegistration[]> {
     await connectDB();
 
     const registrations = await Registration.find({ userId: session.user.id })
-        .populate("eventId", "title slug date venue coverImage category type status")
+        .populate("eventId", "title slug date venue coverImage category type status price pricePerPerson isTeamEvent teamSize")
         .sort({ createdAt: -1 })
         .lean();
 
     return serialize(registrations) as IRegistration[];
+}
+
+export async function updateTeamMember(
+    registrationId: string,
+    memberIndex: number,
+    data: { name: string; email: string; usn?: string }
+) {
+    const session = await requireAuth();
+    await connectDB();
+
+    const reg = await Registration.findOne({ _id: registrationId, userId: session.user.id });
+    if (!reg) return { success: false, error: "Registration not found." };
+    if (reg.status !== "confirmed") return { success: false, error: "Registration is not confirmed." };
+    if (!reg.isTeamRegistration) return { success: false, error: "Not a team registration." };
+    if (memberIndex < 0 || memberIndex >= reg.teamMembers.length) return { success: false, error: "Invalid member index." };
+
+    const normalizedEmail = data.email.toLowerCase().trim();
+
+    const leaderUser = await User.findById(session.user.id).select("email").lean();
+    if ((leaderUser as any)?.email === normalizedEmail) {
+        return { success: false, error: "Cannot set member email to your own email." };
+    }
+
+    const emailConflict = reg.teamMembers.some((m: any, i: number) =>
+        i !== memberIndex && m.email === normalizedEmail
+    );
+    if (emailConflict) return { success: false, error: "This email is already used by another team member." };
+
+    const oldEmail = reg.teamMembers[memberIndex].email;
+    reg.teamMembers[memberIndex].name = data.name.trim();
+    reg.teamMembers[memberIndex].email = normalizedEmail;
+    reg.teamMembers[memberIndex].usn = data.usn?.trim() || null;
+
+    if (oldEmail !== normalizedEmail) {
+        const newUser = await User.findOne({ email: normalizedEmail }).lean();
+        reg.teamMembers[memberIndex].userId = (newUser as any)?._id ?? null;
+
+        const memberTickets = await Ticket.find({ registrationId: reg._id, teamRole: "member" }).sort({ _id: 1 });
+        if (memberTickets[memberIndex]) {
+            await Ticket.findByIdAndUpdate(memberTickets[memberIndex]._id, {
+                userId: (newUser as any)?._id ?? null,
+            });
+        }
+    }
+
+    reg.markModified("teamMembers");
+    await reg.save();
+
+    return { success: true };
+}
+
+export async function removeTeamMember(registrationId: string, memberIndex: number) {
+    const session = await requireAuth();
+    await connectDB();
+
+    const reg = await Registration.findOne({ _id: registrationId, userId: session.user.id }).populate("eventId");
+    if (!reg) return { success: false, error: "Registration not found." };
+    if (reg.status !== "confirmed") return { success: false, error: "Registration is not confirmed." };
+    if (!reg.isTeamRegistration) return { success: false, error: "Not a team registration." };
+
+    const event = reg.eventId as any;
+    const minTeammates = (event?.teamSize?.min ?? 2) - 1;
+
+    if (reg.teamMembers.length <= minTeammates) {
+        const minTotal = event?.teamSize?.min ?? 2;
+        return { success: false, error: `Cannot remove member — team minimum is ${minTotal} (including you).` };
+    }
+
+    if (memberIndex < 0 || memberIndex >= reg.teamMembers.length) return { success: false, error: "Invalid member index." };
+
+    const memberTickets = await Ticket.find({ registrationId: reg._id, teamRole: "member" }).sort({ _id: 1 });
+    if (memberTickets[memberIndex]) {
+        await Ticket.findByIdAndDelete(memberTickets[memberIndex]._id);
+    }
+
+    reg.teamMembers.splice(memberIndex, 1);
+    reg.markModified("teamMembers");
+    await reg.save();
+
+    return { success: true };
+}
+
+export async function addTeamMember(registrationId: string, member: { name: string; email: string; usn?: string }) {
+    const session = await requireAuth();
+    await connectDB();
+
+    const reg = await Registration.findOne({ _id: registrationId, userId: session.user.id }).populate("eventId");
+    if (!reg) return { success: false, error: "Registration not found.", requiresPayment: false };
+    if (reg.status !== "confirmed") return { success: false, error: "Registration is not confirmed.", requiresPayment: false };
+    if (!reg.isTeamRegistration) return { success: false, error: "Not a team registration.", requiresPayment: false };
+
+    const event = reg.eventId as any;
+    const maxTeammates = (event?.teamSize?.max ?? 5) - 1;
+
+    if (reg.teamMembers.length >= maxTeammates) {
+        return { success: false, error: `Team is already at the maximum size (${event?.teamSize?.max ?? 5} including you).`, requiresPayment: false };
+    }
+
+    const normalizedEmail = member.email.toLowerCase().trim();
+
+    const leaderUser = await User.findById(session.user.id).select("name email").lean();
+    if ((leaderUser as any)?.email === normalizedEmail) {
+        return { success: false, error: "You cannot add yourself as a team member.", requiresPayment: false };
+    }
+
+    const emailConflict = reg.teamMembers.some((m: any) => m.email === normalizedEmail);
+    if (emailConflict) return { success: false, error: "This person is already in your team.", requiresPayment: false };
+
+    if (event?.pricePerPerson && event?.price > 0) {
+        return { success: false, error: null, requiresPayment: true, amount: event.price as number };
+    }
+
+    const memberUser = await User.findOne({ email: normalizedEmail });
+    const memberQR = generateQRToken();
+
+    await Registration.findByIdAndUpdate(reg._id, {
+        $push: { teamMembers: { name: member.name.trim(), email: normalizedEmail, usn: member.usn?.trim() || null, userId: memberUser?._id ?? null } },
+    });
+
+    await Ticket.create({
+        registrationId: reg._id,
+        eventId: event._id,
+        userId: memberUser?._id ?? undefined,
+        qrCode: memberQR,
+        teamRole: "member",
+        teamId: reg.teamId,
+        attendanceStatus: false,
+    });
+
+    if (memberUser) {
+        try {
+            const emailDate = formatEventDate(event.date.start, event.date.end);
+            await sendTicketConfirmationEmail({
+                to: memberUser.email,
+                name: memberUser.name,
+                eventTitle: event.title,
+                eventDate: emailDate,
+                venue: event.venue ?? undefined,
+                ticketId: memberQR,
+            });
+        } catch (err: any) {
+            console.error("[addTeamMember] ticket email failed:", err?.message);
+        }
+        await User.findByIdAndUpdate(memberUser._id, { $addToSet: { registeredEvents: reg._id } });
+    } else {
+        try {
+            await sendTeamMemberInviteEmail({
+                to: member.email,
+                memberName: member.name,
+                leaderName: (leaderUser as any)?.name ?? "Your team leader",
+                eventTitle: event.title,
+            });
+        } catch (err: any) {
+            console.error("[addTeamMember] invite email failed:", err?.message);
+        }
+    }
+
+    return { success: true, requiresPayment: false, error: null };
 }
 
 export async function getMyTickets(): Promise<ITicket[]> {

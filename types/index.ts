@@ -82,6 +82,7 @@ export interface IFormResponse {
 export interface ITeamMember {
     name: string;
     email: string;
+    usn?: string | null;
     /** Populated once the invitee creates their account */
     userId?: Types.ObjectId | string;
 }
@@ -206,6 +207,7 @@ export interface IRegistration {
     /** The slot chosen during registration (only when event has slots) */
     slotId?: string;
     paymentId?: string;
+    addMemberOrderIds?: string[];
     paymentStatus: PaymentStatus;
     status: RegistrationStatus;
     createdAt: Date;

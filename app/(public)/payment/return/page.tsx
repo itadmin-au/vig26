@@ -44,11 +44,18 @@ function HdfcReturnInner() {
         }
 
         let pending: {
-            eventId: string;
+            type?: "registration" | "add_member";
+            eventId?: string;
             eventTitle: string;
             whatsappLink?: string;
-            teamMembers: { name: string; email: string }[];
-            formResponses: { fieldId: string; value: string }[];
+            leaderUsn?: string;
+            teamMembers?: { name: string; email: string; usn?: string }[];
+            formResponses?: { fieldId: string; value: string }[];
+            // add_member fields
+            registrationId?: string;
+            memberName?: string;
+            memberEmail?: string;
+            memberUsn?: string;
         };
 
         try {
@@ -62,7 +69,37 @@ function HdfcReturnInner() {
         setEventTitle(pending.eventTitle ?? "");
         setWhatsappLink(pending.whatsappLink);
 
-        // Call verify API
+        // Handle add-member payment flow
+        if (pending.type === "add_member") {
+            fetch("/api/payment/verify-add-member", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    orderId,
+                    registrationId: pending.registrationId,
+                    memberName: pending.memberName,
+                    memberEmail: pending.memberEmail,
+                    memberUsn: pending.memberUsn,
+                }),
+            })
+                .then((res) => res.json())
+                .then((json) => {
+                    if (json.success) {
+                        sessionStorage.removeItem("hdfc_pending");
+                        setState("success");
+                    } else {
+                        setState("failed");
+                        setErrorMsg(json.error ?? "Payment verification failed. Contact support with order ID: " + orderId);
+                    }
+                })
+                .catch(() => {
+                    setState("error");
+                    setErrorMsg("Network error while verifying payment. Contact support with order ID: " + orderId);
+                });
+            return;
+        }
+
+        // Call verify API (standard registration flow)
         fetch("/api/payment/verify", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -70,6 +107,7 @@ function HdfcReturnInner() {
                 orderId,
                 provider: "hdfc",
                 eventId: pending.eventId,
+                leaderUsn: pending.leaderUsn,
                 teamMembers: pending.teamMembers ?? [],
                 formResponses: pending.formResponses ?? [],
             }),
@@ -111,11 +149,15 @@ function HdfcReturnInner() {
                         <IconCheck size={32} className="text-green-600" />
                     </div>
                     <div>
-                        <h1 className="text-xl font-bold text-zinc-900">You&apos;re registered!</h1>
+                        <h1 className="text-xl font-bold text-zinc-900">
+                            {ticketCount === 0 ? "Member added!" : "You're registered!"}
+                        </h1>
                         <p className="text-sm text-zinc-500 mt-2">
-                            {ticketCount > 1
-                                ? `${ticketCount} tickets generated and sent via email.`
-                                : "Your ticket has been sent to your email. See you at the event!"}
+                            {ticketCount === 0
+                                ? "The new team member has been added and their ticket sent via email."
+                                : ticketCount > 1
+                                    ? `${ticketCount} tickets generated and sent via email.`
+                                    : "Your ticket has been sent to your email. See you at the event!"}
                         </p>
                     </div>
                     {eventTitle && (

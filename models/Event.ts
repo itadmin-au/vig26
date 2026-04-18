@@ -31,6 +31,7 @@ const RoundSchema = new Schema(
 // ─── FormField Sub-schema ────────────────────────────────────────────────────
 const FormFieldSchema = new Schema(
   {
+    _id: { type: String },
     label: { type: String, required: true, trim: true },
     type: {
       type: String,
@@ -42,7 +43,7 @@ const FormFieldSchema = new Schema(
     options: { type: [String], default: [] }, // for dropdown
     order: { type: Number, required: true, default: 0 },
   },
-  { _id: true }
+  { _id: false }
 );
 
 // ─── Event Schema ────────────────────────────────────────────────────────────

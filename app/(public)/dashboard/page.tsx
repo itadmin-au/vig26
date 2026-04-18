@@ -7,8 +7,13 @@ import { useSession, signOut } from "next-auth/react";
 import { useMyTickets, useMyRegistrations } from "@/hooks/use-tickets";
 import {
   IconTicket, IconCalendarEvent, IconMapPin, IconQrcode,
-  IconX, IconUser, IconLogout, IconArrowUpRight,
+  IconX, IconUser, IconLogout, IconArrowUpRight, IconUsers,
+  IconPencil, IconTrash, IconPlus, IconCheck, IconLoader2,
+  IconChevronDown, IconChevronUp, IconAlertCircle, IconCreditCard,
 } from "@tabler/icons-react";
+import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
+import { updateTeamMember, removeTeamMember, addTeamMember } from "@/actions/registrations";
 import type { ITicket, IRegistration } from "@/types";
 
 // ─── QR Modal ─────────────────────────────────────────────────────────────────
@@ -161,51 +166,369 @@ function TicketCard({ ticket, onQR }: { ticket: ITicket; onQR: () => void }) {
   );
 }
 
-// ─── Registration Row ──────────────────────────────────────────────────────────
+// ─── Team Management Panel ────────────────────────────────────────────────────
 
-function RegistrationRow({ reg }: { reg: IRegistration }) {
+type EditingMember = { index: number; name: string; email: string; usn: string } | null;
+
+function TeamManagePanel({
+  reg,
+  onRefresh,
+}: {
+  reg: IRegistration;
+  onRefresh: () => void;
+}) {
   const event = reg.eventId as any;
+  const members: { name: string; email: string; usn?: string | null; userId?: any }[] = reg.teamMembers as any;
+  const maxTotal = event?.teamSize?.max ?? 5;
+  const minTotal = event?.teamSize?.min ?? 2;
+  const maxTeammates = maxTotal - 1;
+  const minTeammates = minTotal - 1;
+  const pricePerPerson: boolean = !!event?.pricePerPerson;
+  const memberPrice: number = event?.price ?? 0;
+  const canAdd = members.length < maxTeammates;
+
+  const [editing, setEditing] = useState<EditingMember>(null);
+  const [addForm, setAddForm] = useState<{ name: string; email: string; usn: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function handleSaveEdit() {
+    if (!editing) return;
+    if (!editing.name.trim()) { toast.error("Name is required."); return; }
+    if (!editing.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editing.email)) {
+      toast.error("Valid email is required."); return;
+    }
+    setBusy(true);
+    const res = await updateTeamMember(reg._id.toString(), editing.index, {
+      name: editing.name,
+      email: editing.email,
+      usn: editing.usn,
+    });
+    setBusy(false);
+    if (res.success) {
+      toast.success("Member updated.");
+      setEditing(null);
+      onRefresh();
+    } else {
+      toast.error(res.error ?? "Failed to update member.");
+    }
+  }
+
+  async function handleRemove(index: number) {
+    if (!confirm("Remove this member? No refund will be issued.")) return;
+    setBusy(true);
+    const res = await removeTeamMember(reg._id.toString(), index);
+    setBusy(false);
+    if (res.success) {
+      toast.success("Member removed.");
+      onRefresh();
+    } else {
+      toast.error(res.error ?? "Failed to remove member.");
+    }
+  }
+
+  async function handleAdd() {
+    if (!addForm) return;
+    if (!addForm.name.trim()) { toast.error("Name is required."); return; }
+    if (!addForm.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(addForm.email)) {
+      toast.error("Valid email is required."); return;
+    }
+
+    setBusy(true);
+    const res = await addTeamMember(reg._id.toString(), { name: addForm.name, email: addForm.email, usn: addForm.usn });
+    setBusy(false);
+
+    if ("requiresPayment" in res && res.requiresPayment) {
+      // Initiate HDFC payment for per-person event
+      setBusy(true);
+      try {
+        const orderRes = await fetch("/api/payment/add-member-order", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            registrationId: reg._id.toString(),
+            memberName: addForm.name,
+            memberEmail: addForm.email,
+          }),
+        });
+        const orderJson = await orderRes.json();
+        setBusy(false);
+        if (!orderJson.success) { toast.error(orderJson.error ?? "Failed to create payment order."); return; }
+
+        sessionStorage.setItem("hdfc_pending", JSON.stringify({
+          type: "add_member",
+          registrationId: reg._id.toString(),
+          memberName: addForm.name,
+          memberEmail: addForm.email,
+          memberUsn: addForm.usn,
+          eventTitle: event?.title ?? "",
+        }));
+        window.location.href = orderJson.data.paymentLink;
+      } catch {
+        setBusy(false);
+        toast.error("Network error. Please try again.");
+      }
+      return;
+    }
+
+    if (res.success) {
+      toast.success("Member added and ticket sent.");
+      setAddForm(null);
+      onRefresh();
+    } else {
+      toast.error(res.error ?? "Failed to add member.");
+    }
+  }
 
   return (
-    <div className="flex items-center justify-between px-4 py-3.5 hover:bg-zinc-50 transition-colors">
-      <div className="flex items-center gap-3 min-w-0">
-        <div className="w-8 h-8 rounded-lg bg-zinc-100 overflow-hidden shrink-0">
-          {event?.coverImage ? (
-            <img src={event.coverImage} alt="" className="w-full h-full object-cover" />
+    <div className="px-4 pb-4 pt-1 bg-zinc-50 border-t border-zinc-100 space-y-3">
+      <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide pt-2">
+        Team Members ({members.length + 1} / {maxTotal})
+      </p>
+
+      {/* Leader row — read-only */}
+      <div className="bg-white border border-zinc-200 rounded-xl px-3 py-2.5">
+        <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">You · Leader</span>
+      </div>
+
+      {/* Member rows */}
+      {members.map((m, i) => (
+        <div key={i}>
+          {editing?.index === i ? (
+            <div className="bg-zinc-50 border border-zinc-200 rounded-xl p-4 space-y-3">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-medium text-zinc-600">Editing member {i + 2}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-zinc-500 mb-1 block">Name</label>
+                  <Input
+                    value={editing.name}
+                    onChange={(e) => setEditing({ ...editing, name: e.target.value })}
+                    placeholder="Full name"
+                    className="h-9 bg-white text-sm"
+                    disabled={busy}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-zinc-500 mb-1 block">Email</label>
+                  <Input
+                    type="email"
+                    value={editing.email}
+                    onChange={(e) => setEditing({ ...editing, email: e.target.value })}
+                    placeholder="email@example.com"
+                    className="h-9 bg-white text-sm"
+                    disabled={busy}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-zinc-500 mb-1 block">USN / College ID <span className="text-zinc-400">(optional)</span></label>
+                <Input
+                  value={editing.usn}
+                  onChange={(e) => setEditing({ ...editing, usn: e.target.value })}
+                  placeholder="e.g. 1AT21CS045"
+                  className="h-9 bg-white text-sm"
+                  disabled={busy}
+                />
+              </div>
+              <div className="flex gap-2 justify-end pt-1">
+                <button
+                  onClick={() => setEditing(null)}
+                  disabled={busy}
+                  className="text-xs px-3 py-1.5 rounded-lg border border-zinc-200 text-zinc-500 hover:bg-zinc-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveEdit}
+                  disabled={busy}
+                  className="text-xs px-3 py-1.5 rounded-lg bg-primary text-white hover:bg-primary/80 flex items-center gap-1.5"
+                >
+                  {busy ? <IconLoader2 size={12} className="animate-spin" /> : <IconCheck size={12} />}
+                  Save
+                </button>
+              </div>
+            </div>
           ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <IconCalendarEvent size={14} className="text-zinc-300" />
+            <div className="flex items-center justify-between bg-white border border-zinc-200 rounded-xl px-3 py-2.5">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-zinc-800 truncate">{m.name}</p>
+                <p className="text-xs text-zinc-400 truncate">{m.email}{m.usn ? ` · ${m.usn}` : ""}</p>
+              </div>
+              <div className="flex items-center gap-1 shrink-0 ml-2">
+                <button
+                  onClick={() => setEditing({ index: i, name: m.name, email: m.email, usn: m.usn ?? "" })}
+                  disabled={busy}
+                  className="p-1.5 text-zinc-400 hover:text-zinc-700 rounded-lg hover:bg-zinc-100"
+                  title="Edit member"
+                >
+                  <IconPencil size={14} />
+                </button>
+                <button
+                  onClick={() => handleRemove(i)}
+                  disabled={busy || members.length <= minTeammates}
+                  className="p-1.5 text-zinc-400 hover:text-red-500 rounded-lg hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                  title={members.length <= minTeammates ? `Min team size is ${minTotal}` : "Remove member (no refund)"}
+                >
+                  <IconTrash size={14} />
+                </button>
+              </div>
             </div>
           )}
         </div>
-        <div className="min-w-0">
-          <p className="text-sm font-medium text-zinc-900 truncate">{event?.title ?? "—"}</p>
-          <p className="text-xs text-zinc-400 mt-0.5">
-            {event?.date?.start
-              ? new Date(event.date.start).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
-              : "—"}
-            {reg.isTeamRegistration && " · Team registration"}
-          </p>
+      ))}
+
+      {/* Add member */}
+      {canAdd && !addForm && (
+        <button
+          onClick={() => setAddForm({ name: "", email: "", usn: "" })}
+          disabled={busy}
+          className="flex items-center gap-2 w-full justify-center py-2.5 border-2 border-dashed border-zinc-200 rounded-xl text-xs text-zinc-500 hover:border-primary/40 hover:text-primary transition-colors"
+        >
+          <IconPlus size={13} />
+          Add member
+          {pricePerPerson && memberPrice > 0 && (
+            <span className="ml-1 text-zinc-400">(₹{memberPrice} extra)</span>
+          )}
+        </button>
+      )}
+
+      {addForm && (
+        <div className="bg-zinc-50 border border-zinc-200 rounded-xl p-4 space-y-3">
+          <span className="text-xs font-medium text-zinc-600">New member</span>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-zinc-500 mb-1 block">Name</label>
+              <Input
+                value={addForm.name}
+                onChange={(e) => setAddForm({ ...addForm, name: e.target.value })}
+                placeholder="Full name"
+                className="h-9 bg-white text-sm"
+                disabled={busy}
+              />
+            </div>
+            <div>
+              <label className="text-xs text-zinc-500 mb-1 block">Email</label>
+              <Input
+                type="email"
+                value={addForm.email}
+                onChange={(e) => setAddForm({ ...addForm, email: e.target.value })}
+                placeholder="email@example.com"
+                className="h-9 bg-white text-sm"
+                disabled={busy}
+              />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-zinc-500 mb-1 block">USN / College ID <span className="text-zinc-400">(optional)</span></label>
+            <Input
+              value={addForm.usn}
+              onChange={(e) => setAddForm({ ...addForm, usn: e.target.value })}
+              placeholder="e.g. 1AT21CS045"
+              className="h-9 bg-white text-sm"
+              disabled={busy}
+            />
+          </div>
+          {pricePerPerson && memberPrice > 0 && (
+            <div className="flex items-start gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-2.5 py-2">
+              <IconCreditCard size={13} className="shrink-0 mt-0.5" />
+              Adding this member costs ₹{memberPrice}. You'll be redirected to pay.
+            </div>
+          )}
+          <div className="flex gap-2 justify-end pt-1">
+            <button
+              onClick={() => setAddForm(null)}
+              disabled={busy}
+              className="text-xs px-3 py-1.5 rounded-lg border border-zinc-200 text-zinc-500 hover:bg-zinc-100"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleAdd}
+              disabled={busy}
+              className="text-xs px-3 py-1.5 rounded-lg bg-primary text-white hover:bg-primary/80 flex items-center gap-1.5"
+            >
+              {busy ? <IconLoader2 size={12} className="animate-spin" /> : (pricePerPerson && memberPrice > 0 ? <IconCreditCard size={12} /> : <IconPlus size={12} />)}
+              {pricePerPerson && memberPrice > 0 ? `Pay ₹${memberPrice} & Add` : "Add Member"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      <p className="text-xs text-zinc-400 flex items-center gap-1">
+        <IconAlertCircle size={11} />
+        Removing a member does not issue a refund.
+      </p>
+    </div>
+  );
+}
+
+// ─── Registration Row ──────────────────────────────────────────────────────────
+
+function RegistrationRow({ reg, userId, onRefresh }: { reg: IRegistration; userId: string; onRefresh: () => void }) {
+  const event = reg.eventId as any;
+  const isLeader = reg.userId.toString() === userId;
+  const canManageTeam = isLeader && reg.isTeamRegistration && reg.status === "confirmed";
+  const [teamOpen, setTeamOpen] = useState(false);
+
+  return (
+    <div>
+      <div
+        className={`flex items-center justify-between px-4 py-3.5 transition-colors hover:bg-zinc-50 ${canManageTeam ? "cursor-pointer" : ""}`}
+        onClick={canManageTeam ? () => setTeamOpen((v) => !v) : undefined}
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-8 h-8 rounded-lg bg-zinc-100 overflow-hidden shrink-0">
+            {event?.coverImage ? (
+              <img src={event.coverImage} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <IconCalendarEvent size={14} className="text-zinc-300" />
+              </div>
+            )}
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-zinc-900 truncate">{event?.title ?? "—"}</p>
+            <p className="text-xs text-zinc-400 mt-0.5">
+              {event?.date?.start
+                ? new Date(event.date.start).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+                : "—"}
+              {reg.isTeamRegistration && " · Team registration"}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${reg.status === "confirmed" ? "bg-green-50 text-green-700"
+              : reg.status === "pending" ? "bg-yellow-50 text-yellow-700"
+                : "bg-red-50 text-red-600"
+            }`}>
+            {reg.status}
+          </span>
+          {event?.status === "cancelled" && (
+            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-100">
+              Cancelled
+            </span>
+          )}
+          {canManageTeam && (
+            <span className="flex items-center gap-1 text-zinc-400">
+              <IconUsers size={13} />
+              {teamOpen ? <IconChevronUp size={13} /> : <IconChevronDown size={13} />}
+            </span>
+          )}
+          {event?.slug && (
+            <Link
+              href={`/events/${event.slug}`}
+              className="p-1 text-zinc-400 hover:text-zinc-700"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <IconArrowUpRight size={14} />
+            </Link>
+          )}
         </div>
       </div>
-      <div className="flex items-center gap-2 shrink-0">
-        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${reg.status === "confirmed" ? "bg-green-50 text-green-700"
-            : reg.status === "pending" ? "bg-yellow-50 text-yellow-700"
-              : "bg-red-50 text-red-600"
-          }`}>
-          {reg.status}
-        </span>
-        {event?.status === "cancelled" && (
-          <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-100">
-            Cancelled
-          </span>
-        )}
-        {event?.slug && (
-          <Link href={`/events/${event.slug}`} className="p-1 text-zinc-400 hover:text-zinc-700">
-            <IconArrowUpRight size={14} />
-          </Link>
-        )}
-      </div>
+      {canManageTeam && teamOpen && (
+        <TeamManagePanel reg={reg} onRefresh={onRefresh} />
+      )}
     </div>
   );
 }
@@ -215,7 +538,7 @@ function RegistrationRow({ reg }: { reg: IRegistration }) {
 export default function DashboardPage() {
   const { data: session } = useSession();
   const { tickets, loading: ticketsLoading } = useMyTickets();
-  const { registrations, loading: regsLoading } = useMyRegistrations();
+  const { registrations, loading: regsLoading, refetch: refetchRegistrations } = useMyRegistrations();
   const [ticketTab, setTicketTab] = useState<"upcoming" | "past">("upcoming");
   const [activeQR, setActiveQR] = useState<ITicket | null>(null);
 
@@ -349,7 +672,12 @@ export default function DashboardPage() {
             ) : (
               <div className="divide-y divide-zinc-100">
                 {registrations.map((reg) => (
-                  <RegistrationRow key={reg._id.toString()} reg={reg} />
+                  <RegistrationRow
+                    key={reg._id.toString()}
+                    reg={reg}
+                    userId={session?.user?.id ?? ""}
+                    onRefresh={refetchRegistrations}
+                  />
                 ))}
               </div>
             )}

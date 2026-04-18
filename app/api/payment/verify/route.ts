@@ -32,6 +32,7 @@ export async function POST(req: Request) {
             orderId,
             eventId,
             provider = "cashfree",
+            leaderUsn,
             teamMembers = [],
             formResponses = [],
         } = body;
@@ -192,6 +193,10 @@ export async function POST(req: Request) {
                 // Reset mutable state on each attempt (withTransaction may retry on transient errors)
                 emailTasks.length = 0;
                 ticketCount = 1;
+
+                if (leaderUsn?.trim()) {
+                    await User.findByIdAndUpdate(session.user.id, { collegeId: leaderUsn.trim() }, { session: dbSession });
+                }
 
                 const [reg] = await Registration.create(
                     [

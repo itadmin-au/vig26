@@ -33,6 +33,7 @@ const RegistrationSchema = new Schema<IRegistrationDocument>(
             {
                 name: { type: String, required: true, trim: true },
                 email: { type: String, required: true, lowercase: true, trim: true },
+                usn: { type: String, default: null, trim: true },
                 userId: { type: Schema.Types.ObjectId, ref: "User", default: null },
             },
         ],
@@ -48,6 +49,10 @@ const RegistrationSchema = new Schema<IRegistrationDocument>(
         paymentId: {
             type: String,
             default: null,
+        },
+        addMemberOrderIds: {
+            type: [String],
+            default: [],
         },
         paymentStatus: {
             type: String,
