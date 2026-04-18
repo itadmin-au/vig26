@@ -1,7 +1,7 @@
 // app/dashboard/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
 import { useMyTickets, useMyRegistrations } from "@/hooks/use-tickets";
@@ -190,6 +190,33 @@ function TeamManagePanel({
   const [editing, setEditing] = useState<EditingMember>(null);
   const [addForm, setAddForm] = useState<{ name: string; email: string; usn: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [addLookup, setAddLookup] = useState<{ loading: boolean; found: boolean; fetched: boolean }>({ loading: false, found: false, fetched: false });
+  const addDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const addFormRef = useRef(addForm);
+  addFormRef.current = addForm;
+
+  function handleAddEmailChange(email: string) {
+    setAddForm((prev) => prev ? { ...prev, email } : null);
+    setAddLookup({ loading: false, found: false, fetched: false });
+    if (addDebounceRef.current) clearTimeout(addDebounceRef.current);
+    const trimmed = email.trim().toLowerCase();
+    if (!trimmed || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) return;
+    setAddLookup({ loading: true, found: false, fetched: false });
+    addDebounceRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/users/member-lookup?email=${encodeURIComponent(trimmed)}`);
+        const data = await res.json();
+        if (data.exists) {
+          setAddForm((prev) => prev ? { ...prev, name: data.user.name, usn: data.user.usn || prev.usn } : null);
+          setAddLookup({ loading: false, found: true, fetched: true });
+        } else {
+          setAddLookup({ loading: false, found: false, fetched: true });
+        }
+      } catch {
+        setAddLookup({ loading: false, found: false, fetched: true });
+      }
+    }, 500);
+  }
 
   async function handleSaveEdit() {
     if (!editing) return;
@@ -381,7 +408,7 @@ function TeamManagePanel({
       {/* Add member */}
       {canAdd && !addForm && (
         <button
-          onClick={() => setAddForm({ name: "", email: "", usn: "" })}
+          onClick={() => { setAddForm({ name: "", email: "", usn: "" }); setAddLookup({ loading: false, found: false, fetched: false }); }}
           disabled={busy}
           className="flex items-center gap-2 w-full justify-center py-2.5 border-2 border-dashed border-zinc-200 rounded-xl text-xs text-zinc-500 hover:border-primary/40 hover:text-primary transition-colors"
         >
@@ -408,11 +435,16 @@ function TeamManagePanel({
               />
             </div>
             <div>
-              <label className="text-xs text-zinc-500 mb-1 block">Email</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs text-zinc-500">Email</label>
+                {addLookup.loading && <span className="text-xs text-zinc-400 flex items-center gap-1"><IconLoader2 size={10} className="animate-spin" /> Looking up…</span>}
+                {!addLookup.loading && addLookup.fetched && addLookup.found && <span className="text-xs text-green-600 flex items-center gap-1"><IconCheck size={10} /> Found</span>}
+                {!addLookup.loading && addLookup.fetched && !addLookup.found && <span className="text-xs text-zinc-400">Not registered</span>}
+              </div>
               <Input
                 type="email"
                 value={addForm.email}
-                onChange={(e) => setAddForm({ ...addForm, email: e.target.value })}
+                onChange={(e) => handleAddEmailChange(e.target.value)}
                 placeholder="email@example.com"
                 className="h-9 bg-white text-sm"
                 disabled={busy}
@@ -437,7 +469,7 @@ function TeamManagePanel({
           )}
           <div className="flex gap-2 justify-end pt-1">
             <button
-              onClick={() => setAddForm(null)}
+              onClick={() => { setAddForm(null); setAddLookup({ loading: false, found: false, fetched: false }); }}
               disabled={busy}
               className="text-xs px-3 py-1.5 rounded-lg border border-zinc-200 text-zinc-500 hover:bg-zinc-100"
             >

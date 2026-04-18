@@ -1,12 +1,12 @@
 // app/events/[slug]/register/page.tsx
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { getEventBySlug } from "@/actions/events";
-import { createRegistration } from "@/actions/registrations";
+import { createRegistration, getUserRegistrationForEvent } from "@/actions/registrations";
 // import { Navbar } from "@/components/navbar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -154,6 +154,8 @@ function SlotStep({
 
 // ─── Step 1: Team ─────────────────────────────────────────────────────────────
 
+type MemberLookup = { loading: boolean; found: boolean; fetched: boolean };
+
 function TeamStep({
     event, leaderName, setLeaderName, leaderEmail, leaderUsn, setLeaderUsn,
     members, setMembers, onNext,
@@ -167,6 +169,56 @@ function TeamStep({
     const totalMax = event.teamSize?.max ?? 2;
     const minTeammates = totalMin - 1;
     const maxTeammates = totalMax - 1;
+
+    const [memberLookups, setMemberLookups] = useState<MemberLookup[]>(
+        () => members.map(() => ({ loading: false, found: false, fetched: false }))
+    );
+    const debounceRefs = useRef<(ReturnType<typeof setTimeout> | null)[]>([]);
+    const membersRef = useRef(members);
+    membersRef.current = members;
+
+    useEffect(() => {
+        setMemberLookups((prev) =>
+            members.map((_, i) => prev[i] ?? { loading: false, found: false, fetched: false })
+        );
+    }, [members.length]);
+
+    function handleMemberEmailChange(i: number, email: string) {
+        setMembers(membersRef.current.map((x, idx) => idx === i ? { ...x, email } : x));
+        setMemberLookups((prev) => prev.map((s, idx) => idx === i ? { loading: false, found: false, fetched: false } : s));
+
+        if (debounceRefs.current[i]) clearTimeout(debounceRefs.current[i]!);
+
+        const trimmed = email.trim().toLowerCase();
+        if (!trimmed || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) return;
+
+        setMemberLookups((prev) => prev.map((s, idx) => idx === i ? { ...s, loading: true } : s));
+        debounceRefs.current[i] = setTimeout(async () => {
+            try {
+                const res = await fetch(`/api/users/member-lookup?email=${encodeURIComponent(trimmed)}`);
+                const data = await res.json();
+                if (data.exists) {
+                    setMembers(membersRef.current.map((x, idx) => idx === i ? { ...x, name: data.user.name, usn: data.user.usn || x.usn } : x));
+                    setMemberLookups((prev) => prev.map((s, idx) => idx === i ? { loading: false, found: true, fetched: true } : s));
+                } else {
+                    setMemberLookups((prev) => prev.map((s, idx) => idx === i ? { loading: false, found: false, fetched: true } : s));
+                }
+            } catch {
+                setMemberLookups((prev) => prev.map((s, idx) => idx === i ? { loading: false, found: false, fetched: true } : s));
+            }
+        }, 500);
+    }
+
+    function removeMember(i: number) {
+        if (debounceRefs.current[i]) clearTimeout(debounceRefs.current[i]!);
+        setMembers(members.filter((_, idx) => idx !== i));
+        setMemberLookups((prev) => prev.filter((_, idx) => idx !== i));
+    }
+
+    function addMember() {
+        setMembers([...members, { name: "", email: "", usn: "" }]);
+        setMemberLookups((prev) => [...prev, { loading: false, found: false, fetched: false }]);
+    }
 
     function validate() {
         if (!leaderName.trim()) { toast.error("Please enter your name."); return false; }
@@ -199,6 +251,7 @@ function TeamStep({
                 <p className="text-xs text-orange-700">You are the team leader. Your ticket is already included. Teammates will receive their ticket via email.</p>
             </div>
             <div className="space-y-3">
+                {/* Leader card */}
                 <div className="bg-zinc-50 border border-zinc-200 rounded-xl p-4">
                     <div className="flex items-center justify-between mb-3">
                         <span className="text-sm font-medium text-zinc-700">Teammate 1</span>
@@ -213,29 +266,56 @@ function TeamStep({
                         <Input value={leaderUsn} onChange={(e) => setLeaderUsn(e.target.value)} placeholder="e.g. 1AT21CS045" className="h-9 bg-white" />
                     </div>
                 </div>
-                {members.map((m, i) => (
-                    <div key={i} className="bg-zinc-50 border border-zinc-200 rounded-xl p-4">
-                        <div className="flex items-center justify-between mb-3">
-                            <span className="text-sm font-medium text-zinc-700">Teammate {i + 2}</span>
-                            {members.length > minTeammates && (
-                                <button type="button" onClick={() => setMembers(members.filter((_, idx) => idx !== i))} className="p-1 text-zinc-400 hover:text-red-500 transition-colors">
-                                    <IconTrash size={15} />
-                                </button>
-                            )}
+
+                {/* Member cards */}
+                {members.map((m, i) => {
+                    const lookup = memberLookups[i] ?? { loading: false, found: false, fetched: false };
+                    return (
+                        <div key={i} className="bg-zinc-50 border border-zinc-200 rounded-xl p-4">
+                            <div className="flex items-center justify-between mb-3">
+                                <span className="text-sm font-medium text-zinc-700">Teammate {i + 2}</span>
+                                {members.length > minTeammates && (
+                                    <button type="button" onClick={() => removeMember(i)} className="p-1 text-zinc-400 hover:text-red-500 transition-colors">
+                                        <IconTrash size={15} />
+                                    </button>
+                                )}
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <Label className="text-xs mb-1">Name</Label>
+                                    <Input
+                                        value={m.name}
+                                        onChange={(e) => setMembers(members.map((x, idx) => idx === i ? { ...x, name: e.target.value } : x))}
+                                        placeholder="Full name"
+                                        className="h-9 bg-white"
+                                    />
+                                </div>
+                                <div>
+                                    <div className="flex items-center justify-between mb-1">
+                                        <Label className="text-xs">Email</Label>
+                                        {lookup.loading && <span className="text-xs text-zinc-400 flex items-center gap-1"><IconLoader2 size={10} className="animate-spin" /> Looking up…</span>}
+                                        {!lookup.loading && lookup.fetched && lookup.found && <span className="text-xs text-green-600 flex items-center gap-1"><IconCheck size={10} /> Found</span>}
+                                        {!lookup.loading && lookup.fetched && !lookup.found && <span className="text-xs text-zinc-400">Not registered</span>}
+                                    </div>
+                                    <Input
+                                        type="email"
+                                        value={m.email}
+                                        onChange={(e) => handleMemberEmailChange(i, e.target.value)}
+                                        placeholder="email@example.com"
+                                        className="h-9 bg-white"
+                                    />
+                                </div>
+                            </div>
+                            <div className="mt-3">
+                                <Label className="text-xs mb-1">USN / College ID <span className="text-zinc-400">(optional)</span></Label>
+                                <Input value={m.usn} onChange={(e) => setMembers(members.map((x, idx) => idx === i ? { ...x, usn: e.target.value } : x))} placeholder="e.g. 1AT21CS045" className="h-9 bg-white" />
+                            </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-3">
-                            <div><Label className="text-xs mb-1">Name</Label><Input value={m.name} onChange={(e) => setMembers(members.map((x, idx) => idx === i ? { ...x, name: e.target.value } : x))} placeholder="Full name" className="h-9 bg-white" /></div>
-                            <div><Label className="text-xs mb-1">Email</Label><Input type="email" value={m.email} onChange={(e) => setMembers(members.map((x, idx) => idx === i ? { ...x, email: e.target.value } : x))} placeholder="email@example.com" className="h-9 bg-white" /></div>
-                        </div>
-                        <div className="mt-3">
-                            <Label className="text-xs mb-1">USN / College ID <span className="text-zinc-400">(optional)</span></Label>
-                            <Input value={m.usn} onChange={(e) => setMembers(members.map((x, idx) => idx === i ? { ...x, usn: e.target.value } : x))} placeholder="e.g. 1AT21CS045" className="h-9 bg-white" />
-                        </div>
-                    </div>
-                ))}
+                    );
+                })}
             </div>
             {members.length < maxTeammates && (
-                <button type="button" onClick={() => setMembers([...members, { name: "", email: "", usn: "" }])} className="flex items-center gap-2 w-full justify-center py-2.5 border-2 border-dashed border-zinc-200 rounded-xl text-sm text-zinc-500 hover:border-primary/40 hover:text-primary transition-colors">
+                <button type="button" onClick={addMember} className="flex items-center gap-2 w-full justify-center py-2.5 border-2 border-dashed border-zinc-200 rounded-xl text-sm text-zinc-500 hover:border-primary/40 hover:text-primary transition-colors">
                     <IconPlus size={15} /> Add teammate ({members.length + 2} of {maxTeammates + 1} max)
                 </button>
             )}
@@ -517,6 +597,7 @@ export default function RegisterPage() {
     const [paymentError, setPaymentError] = useState<string | null>(null);
     const provider = "hdfc" as const;
 
+    const [alreadyRegistered, setAlreadyRegistered] = useState(false);
     const [members, setMembers] = useState<{ name: string; email: string; usn: string }[]>([]);
     const [responses, setResponses] = useState<Record<string, string>>({});
     const [leaderName, setLeaderName] = useState("");
@@ -533,14 +614,17 @@ export default function RegisterPage() {
             router.replace(`/auth/login?callbackUrl=/events/${slug}/register`); return;
         }
         if (status === "loading") return;
-        getEventBySlug(slug as string).then((data) => {
+        getEventBySlug(slug as string).then(async (data) => {
             if (!data || data.status !== "published") { router.replace(`/events/${slug}`); return; }
             if (data.externalRegistrationUrl) { router.replace(`/events/${slug}`); return; }
             setEvent(data);
             setLeaderName(session?.user?.name ?? "");
+            setLeaderUsn(session?.user?.collegeId ?? "");
             if (data.isTeamEvent && data.teamSize) {
                 setMembers(Array.from({ length: data.teamSize.min - 1 }, () => ({ name: "", email: "", usn: "" })));
             }
+            const regCheck = await getUserRegistrationForEvent(data._id.toString());
+            if (regCheck.registered) { setAlreadyRegistered(true); }
             setLoading(false);
         });
     }, [slug, status]);
@@ -688,6 +772,30 @@ export default function RegisterPage() {
     }
 
     if (!event) return null;
+
+    if (alreadyRegistered) {
+        return (
+            <div className="min-h-screen bg-zinc-50">
+                <main className="max-w-lg mx-auto px-4 py-8">
+                    <Link href={`/events/${slug}`} className="inline-flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-800 mb-6 transition-colors">
+                        <IconArrowLeft size={15} /> {event.title}
+                    </Link>
+                    <div className="bg-white rounded-2xl border border-zinc-200 p-8 text-center space-y-4">
+                        <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center mx-auto">
+                            <IconCheck size={28} className="text-green-600" />
+                        </div>
+                        <div>
+                            <h2 className="text-lg font-bold text-zinc-900">Already Registered</h2>
+                            <p className="text-sm text-zinc-500 mt-1.5">You&apos;re already registered for <strong>{event.title}</strong>. Check your tickets below.</p>
+                        </div>
+                        <Link href="/dashboard" className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-primary/80 text-primary-foreground text-sm font-semibold rounded-xl transition-colors">
+                            <IconTicket size={15} /> View My Tickets
+                        </Link>
+                    </div>
+                </main>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-zinc-50">
