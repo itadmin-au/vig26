@@ -94,8 +94,8 @@ function EventCard({ event }: { event: IEvent }) {
                             <span className="truncate">{event.venue}</span>
                         </div>
                     )}
-                    {slotsLeft !== null && !isFull && (
-                        <div className="flex items-center gap-1 text-xs text-zinc-400 shrink-0">
+                    {slotsLeft !== null && !isFull && slotsLeft <= 10 && (
+                        <div className="flex items-center gap-1 text-xs text-amber-500 shrink-0">
                             <IconUsers size={13} />
                             <span>{slotsLeft} left</span>
                         </div>

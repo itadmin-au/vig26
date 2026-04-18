@@ -215,8 +215,8 @@ export default function EventDetailPage() {
                                                 <div className="shrink-0">
                                                     {slotFull ? (
                                                         <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-red-50 text-red-500">Full</span>
-                                                    ) : remaining !== null ? (
-                                                        <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${remaining <= 10 ? "bg-amber-50 text-amber-600" : "bg-green-50 text-green-600"}`}>
+                                                    ) : remaining !== null && remaining <= 10 ? (
+                                                        <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-amber-50 text-amber-600">
                                                             {remaining} seat{remaining !== 1 ? "s" : ""} left
                                                         </span>
                                                     ) : (
@@ -308,17 +308,17 @@ export default function EventDetailPage() {
                                 </span>
                             </div>
 
-                            {event.capacity > 0 && (
+                            {event.capacity > 0 && (isFull || slotsLeft! <= 10) && (
                                 <div>
                                     <div className="flex items-center justify-between text-sm mb-1.5">
                                         <span className="text-zinc-500">Availability</span>
-                                        <span className={`font-medium ${isFull ? "text-red-500" : slotsLeft! <= 10 ? "text-amber-500" : "text-zinc-700"}`}>
-                                            {isFull ? "Full" : `${slotsLeft} / ${event.capacity} slots left`}
+                                        <span className={`font-medium ${isFull ? "text-red-500" : "text-amber-500"}`}>
+                                            {isFull ? "Full" : `${slotsLeft} slot${slotsLeft !== 1 ? "s" : ""} left`}
                                         </span>
                                     </div>
                                     <div className="h-1.5 bg-zinc-100 rounded-full overflow-hidden">
                                         <div
-                                            className={`h-full rounded-full transition-all ${isFull ? "bg-red-400" : slotsLeft! <= 10 ? "bg-amber-400" : "bg-green-400"}`}
+                                            className={`h-full rounded-full transition-all ${isFull ? "bg-red-400" : "bg-amber-400"}`}
                                             style={{ width: `${Math.min(100, (event.registrationCount / event.capacity) * 100)}%` }}
                                         />
                                     </div>

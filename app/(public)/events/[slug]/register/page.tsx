@@ -79,10 +79,11 @@ function SlotStep({
     }
 
     function getAvailability(slot: IEventSlot) {
-        if (slot.capacity === 0) return { label: "Unlimited", full: false };
+        if (slot.capacity === 0) return { label: "Available", full: false };
         const remaining = Math.max(0, slot.capacity - slot.registrationCount);
         if (remaining === 0) return { label: "Full", full: true };
-        return { label: `${remaining} seat${remaining !== 1 ? "s" : ""} left`, full: false };
+        if (remaining <= 10) return { label: `${remaining} seat${remaining !== 1 ? "s" : ""} left`, full: false };
+        return { label: "Available", full: false };
     }
 
     return (
