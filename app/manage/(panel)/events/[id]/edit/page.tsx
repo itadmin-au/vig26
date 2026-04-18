@@ -307,7 +307,10 @@ export default function EditEventPage() {
             setEvent(found);
 
             if (found) {
-                setFormFields(found.customForm ?? []);
+                setFormFields((found.customForm ?? []).map((f) => ({
+                    ...f,
+                    _id: f._id || Math.random().toString(36).slice(2),
+                })));
                 setIsTeamEvent(found.isTeamEvent);
                 setPricePerPerson((found as any).pricePerPerson ?? false);
                 setPriceValue(String(found.price ?? 0));

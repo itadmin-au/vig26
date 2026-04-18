@@ -557,7 +557,7 @@ export async function updateEvent(id: string, formData: FormData) {
         const doc = await Event.findByIdAndUpdate(id, otherUpdates, { returnDocument: "after" });
         if (!doc) return { success: false, error: "Event not found." };
         // Rebuild customForm: keep existing subdocs by _id, add new ones without _id
-        const existingById = new Map((doc.customForm as any[]).map((f: any) => [f._id.toString(), f]));
+        const existingById = new Map((doc.customForm as any[]).filter((f: any) => f._id != null).map((f: any) => [f._id.toString(), f]));
         doc.customForm = (newFields as any[]).map((f: any) => {
             if (f._id && isValidObjectId(f._id) && existingById.has(f._id)) {
                 const sub = existingById.get(f._id);
