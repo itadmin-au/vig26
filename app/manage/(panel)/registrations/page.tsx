@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { getAllRegistrationsAdmin } from "@/actions/admin";
+import { getAllRegistrationsAdmin, cancelRegistrationAdmin } from "@/actions/admin";
 import {
     IconSearch,
     IconDownload,
@@ -9,6 +9,9 @@ import {
     IconChevronRight,
     IconFilter,
     IconLoader2,
+    IconX,
+    IconCopy,
+    IconCheck,
 } from "@tabler/icons-react";
 import {
     Select,
@@ -46,9 +49,27 @@ function paymentBadge(ps: string) {
     return <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${cls}`}>{ps}</span>;
 }
 
+function CopyButton({ text }: { text: string }) {
+    const [copied, setCopied] = useState(false);
+    function handleCopy() {
+        navigator.clipboard.writeText(text);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+    }
+    return (
+        <button
+            onClick={handleCopy}
+            title="Copy ticket ID"
+            className="ml-1 text-zinc-300 hover:text-orange-500 transition-colors shrink-0"
+        >
+            {copied ? <IconCheck size={12} className="text-green-500" /> : <IconCopy size={12} />}
+        </button>
+    );
+}
+
 function downloadCSV(rows: any[]) {
     const headers = [
-        "Registration ID", "Name", "Email", "College ID",
+        "Registration ID", "Ticket ID(s)", "Name", "Email", "College ID",
         "Event", "Type", "Team ID",
         "Status", "Payment Status", "Transaction ID", "Registered At",
     ];
@@ -56,6 +77,7 @@ function downloadCSV(rows: any[]) {
         headers.map((h) => `"${h}"`).join(","),
         ...rows.map((r) => [
             r._id,
+            (r.tickets ?? []).map((t: any) => t.qrCode).join("; "),
             r.userId?.name ?? "",
             r.userId?.email ?? "",
             r.userId?.collegeId ?? "",
@@ -88,6 +110,7 @@ export default function RegistrationsPage() {
     const [total, setTotal] = useState(0);
     const [totalPages, setTotalPages] = useState(1);
     const [loading, setLoading] = useState(true);
+    const [cancelling, setCancelling] = useState<string | null>(null);
 
     const fetchData = useCallback(async () => {
         setLoading(true);
@@ -113,6 +136,21 @@ export default function RegistrationsPage() {
 
     // Reset to page 1 when filters change
     useEffect(() => { setPage(1); }, [statusTab, paymentStatus, search]);
+
+    async function handleCancel(id: string) {
+        if (!confirm("Cancel this registration? This cannot be undone.")) return;
+        setCancelling(id);
+        try {
+            const result = await cancelRegistrationAdmin(id);
+            if (result.success) {
+                setData((prev) => prev.map((r) => r._id === id ? { ...r, status: "cancelled" } : r));
+            } else {
+                alert(result.error ?? "Failed to cancel.");
+            }
+        } finally {
+            setCancelling(null);
+        }
+    }
 
     function handleSearchSubmit(e: React.FormEvent) {
         e.preventDefault();
@@ -214,12 +252,14 @@ export default function RegistrationsPage() {
                             <thead>
                                 <tr className="border-b border-zinc-100 bg-zinc-50/50">
                                     <th className="text-left px-5 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wide">Participant</th>
+                                    <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wide">Ticket ID</th>
                                     <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wide">Event</th>
                                     <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wide">Type</th>
                                     <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wide">Status</th>
                                     <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wide">Payment</th>
                                     <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wide">Transaction ID</th>
                                     <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wide">Registered</th>
+                                    <th className="px-4 py-3"></th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-zinc-100">
@@ -230,6 +270,22 @@ export default function RegistrationsPage() {
                                             <p className="text-xs text-zinc-400">{reg.userId?.email ?? "—"}</p>
                                             {reg.userId?.collegeId && (
                                                 <p className="text-xs text-zinc-400 font-mono">{reg.userId.collegeId}</p>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-3.5 w-36">
+                                            {reg.tickets?.length > 0 ? (
+                                                <div className="flex flex-col gap-1">
+                                                    {reg.tickets.map((t: any) => (
+                                                        <div key={t._id} className="flex items-center gap-0.5">
+                                                            <span title={t.qrCode} className="text-xs font-mono text-zinc-400 truncate max-w-30">
+                                                                {t.qrCode.slice(0, 8)}…
+                                                            </span>
+                                                            <CopyButton text={t.qrCode} />
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <span className="text-xs text-zinc-300">—</span>
                                             )}
                                         </td>
                                         <td className="px-4 py-3.5 text-zinc-600 max-w-44">
@@ -267,6 +323,18 @@ export default function RegistrationsPage() {
                                                     hour: "2-digit", minute: "2-digit",
                                                 })}
                                             </span>
+                                        </td>
+                                        <td className="px-4 py-3.5">
+                                            {reg.status !== "cancelled" && (
+                                                <button
+                                                    onClick={() => handleCancel(reg._id)}
+                                                    disabled={cancelling === reg._id}
+                                                    className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-red-600 border border-red-200 rounded-md hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                                                >
+                                                    <IconX size={11} />
+                                                    {cancelling === reg._id ? "…" : "Cancel"}
+                                                </button>
+                                            )}
                                         </td>
                                     </tr>
                                 ))}

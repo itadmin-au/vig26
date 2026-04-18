@@ -439,11 +439,41 @@ export async function getAllRegistrationsAdmin(options: {
         Registration.countDocuments(filter),
     ]);
 
+    const regIds = registrations.map((r: any) => r._id);
+    const tickets = await Ticket.find({ registrationId: { $in: regIds } })
+        .select("registrationId qrCode userId")
+        .lean();
+
+    const ticketsByReg = new Map<string, any[]>();
+    for (const t of tickets) {
+        const key = (t.registrationId as any).toString();
+        if (!ticketsByReg.has(key)) ticketsByReg.set(key, []);
+        ticketsByReg.get(key)!.push(t);
+    }
+
+    const enriched = registrations.map((r: any) => ({
+        ...r,
+        tickets: ticketsByReg.get(r._id.toString()) ?? [],
+    }));
+
     return {
         success: true,
-        data: serialize(registrations),
+        data: serialize(enriched),
         total,
         page,
         totalPages: Math.ceil(total / limit),
     };
+}
+
+export async function cancelRegistrationAdmin(registrationId: string) {
+    await requireManagement();
+    await connectDB();
+
+    const reg = await Registration.findById(registrationId);
+    if (!reg) return { success: false, error: "Registration not found." };
+    if (reg.status === "cancelled") return { success: false, error: "Already cancelled." };
+
+    await Registration.findByIdAndUpdate(registrationId, { status: "cancelled" });
+
+    return { success: true };
 }
