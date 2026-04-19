@@ -40,6 +40,15 @@ export async function GET(req: Request) {
         }
 
         if (!registration) {
+            const ticketByQr = await Ticket.findOne({ qrCode: identifier });
+            if (ticketByQr) {
+                registration = await Registration.findById(ticketByQr.registrationId)
+                    .populate("userId", "name email collegeId")
+                    .populate("eventId", "title date venue price isTeamEvent");
+            }
+        }
+
+        if (!registration) {
             return Response.json(
                 { success: false, error: `No registration found for: ${identifier}` },
                 { status: 404 }
@@ -95,13 +104,21 @@ export async function POST(req: Request) {
     }
 
     try {
-        const { identifier } = await req.json();
+        const { identifier, userOverrides } = await req.json();
 
         if (!identifier || typeof identifier !== "string") {
             return Response.json(
                 { success: false, error: "Missing identifier (paymentId or registrationId)." },
                 { status: 400 }
             );
+        }
+
+        // userOverrides: { ticketId: string, email: string }[]
+        const overrideMap: Record<string, string> = {};
+        if (Array.isArray(userOverrides)) {
+            for (const o of userOverrides) {
+                if (o.ticketId && o.email) overrideMap[o.ticketId] = o.email.trim().toLowerCase();
+            }
         }
 
         await connectDB();
@@ -111,6 +128,13 @@ export async function POST(req: Request) {
 
         if (!registration && mongoose.isValidObjectId(identifier.trim())) {
             registration = await Registration.findById(identifier.trim()).populate("userId eventId");
+        }
+
+        if (!registration) {
+            const ticketByQr = await Ticket.findOne({ qrCode: identifier.trim() });
+            if (ticketByQr) {
+                registration = await Registration.findById(ticketByQr.registrationId).populate("userId eventId");
+            }
         }
 
         if (!registration) {
@@ -146,7 +170,22 @@ export async function POST(req: Request) {
         const results: Array<{ email: string; status: "sent" | "failed"; error?: string }> = [];
 
         for (const ticket of tickets) {
-            const user = ticket.userId as any;
+            const ticketId = ticket._id.toString();
+            let user = ticket.userId as any;
+
+            // If an override email was provided for this ticket, look up or use the user
+            if (overrideMap[ticketId]) {
+                const overrideEmail = overrideMap[ticketId];
+                const foundUser = await User.findOne({ email: overrideEmail });
+                if (foundUser) {
+                    await Ticket.findByIdAndUpdate(ticket._id, { userId: foundUser._id });
+                    user = foundUser;
+                } else {
+                    // User not in system — send to the provided email directly without linking
+                    user = { email: overrideEmail, name: overrideEmail };
+                }
+            }
+
             if (!user?.email) {
                 results.push({ email: "(unknown)", status: "failed", error: "No user linked to ticket" });
                 continue;

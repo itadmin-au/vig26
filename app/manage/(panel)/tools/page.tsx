@@ -56,6 +56,7 @@ function RegenerateSection() {
     const [preview, setPreview] = useState<RegistrationPreview | null>(null);
     const [sendLoading, setSendLoading] = useState(false);
     const [sendResults, setSendResults] = useState<SendResult[] | null>(null);
+    const [userOverrides, setUserOverrides] = useState<Record<string, string>>({});
 
     async function handleLookup(e: React.FormEvent) {
         e.preventDefault();
@@ -64,6 +65,7 @@ function RegenerateSection() {
         setLookupError(null);
         setPreview(null);
         setSendResults(null);
+        setUserOverrides({});
         try {
             const res = await fetch(`/api/admin/regenerate-ticket?identifier=${encodeURIComponent(identifier.trim())}`);
             const json = await res.json();
@@ -80,11 +82,14 @@ function RegenerateSection() {
         if (!preview) return;
         setSendLoading(true);
         setSendResults(null);
+        const overrides = Object.entries(userOverrides)
+            .filter(([, email]) => email.trim())
+            .map(([ticketId, email]) => ({ ticketId, email: email.trim() }));
         try {
             const res = await fetch("/api/admin/regenerate-ticket", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ identifier: identifier.trim() }),
+                body: JSON.stringify({ identifier: identifier.trim(), userOverrides: overrides }),
             });
             const json = await res.json();
             if (json.success) {
@@ -100,7 +105,7 @@ function RegenerateSection() {
         }
     }
 
-    function reset() { setIdentifier(""); setPreview(null); setLookupError(null); setSendResults(null); }
+    function reset() { setIdentifier(""); setPreview(null); setLookupError(null); setSendResults(null); setUserOverrides({}); }
 
     return (
         <div className="bg-white rounded-xl border border-zinc-200 p-5 space-y-4">
@@ -169,20 +174,31 @@ function RegenerateSection() {
                         </div>
                         <div className="px-4 py-3">
                             <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-2">Tickets ({preview.tickets.length})</p>
-                            <div className="space-y-2">
+                            <div className="space-y-3">
                                 {preview.tickets.map((t) => (
-                                    <div key={t.ticketId} className="flex items-start justify-between gap-2">
-                                        <div>
-                                            <p className="text-sm text-zinc-700">
-                                                {t.recipientName ?? <span className="italic text-zinc-400">No user linked</span>}
-                                                {t.recipientEmail && <span className="text-zinc-400"> · {t.recipientEmail}</span>}
-                                            </p>
-                                            <p className="text-xs text-zinc-400 font-mono">{t.qrCode}</p>
+                                    <div key={t.ticketId} className="space-y-1.5">
+                                        <div className="flex items-start justify-between gap-2">
+                                            <div>
+                                                <p className="text-sm text-zinc-700">
+                                                    {t.recipientName ?? <span className="italic text-zinc-400">No user linked</span>}
+                                                    {t.recipientEmail && <span className="text-zinc-400"> · {t.recipientEmail}</span>}
+                                                </p>
+                                                <p className="text-xs text-zinc-400 font-mono">{t.qrCode}</p>
+                                            </div>
+                                            <div className="flex gap-1.5 shrink-0">
+                                                <span className="text-xs px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-500 capitalize">{t.teamRole}</span>
+                                                {t.attendanceStatus && <span className="text-xs px-1.5 py-0.5 rounded bg-green-50 text-green-600">checked in</span>}
+                                            </div>
                                         </div>
-                                        <div className="flex gap-1.5 shrink-0">
-                                            <span className="text-xs px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-500 capitalize">{t.teamRole}</span>
-                                            {t.attendanceStatus && <span className="text-xs px-1.5 py-0.5 rounded bg-green-50 text-green-600">checked in</span>}
-                                        </div>
+                                        {!t.recipientEmail && (
+                                            <input
+                                                type="email"
+                                                value={userOverrides[t.ticketId] ?? ""}
+                                                onChange={(e) => setUserOverrides((prev) => ({ ...prev, [t.ticketId]: e.target.value }))}
+                                                placeholder="Link email to send ticket to…"
+                                                className="w-full px-2.5 py-1.5 text-xs border border-amber-200 bg-amber-50 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent placeholder:text-zinc-400"
+                                            />
+                                        )}
                                     </div>
                                 ))}
                             </div>

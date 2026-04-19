@@ -440,6 +440,21 @@ function ReviewStep({
                 </div>
             </div>
 
+            {isPaid && event.checkoutChargeDetails && (
+                <div className="relative overflow-hidden rounded-xl border border-zinc-200 bg-linear-to-br from-zinc-50 to-white p-4">
+                    <div className="absolute right-0 top-0 h-20 w-20 translate-x-8 -translate-y-8 rounded-full bg-zinc-100/80" />
+                    <div className="relative">
+                        <div>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-800">Fee Coverage</p>
+                            <p className="text-xs text-zinc-500">What your registration charges include</p>
+                        </div>
+                    </div>
+                    <div className="relative mt-3 text-sm text-zinc-800 [&_a]:underline [&_a]:text-primary [&_strong]:font-semibold [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-1 [&_code]:bg-zinc-100 [&_code]:px-1 [&_code]:rounded">
+                        <MDPreview source={event.checkoutChargeDetails} style={{ background: "transparent", color: "inherit", fontSize: "inherit" }} />
+                    </div>
+                </div>
+            )}
+
             {/* Team */}
             {event.isTeamEvent && members.length > 0 && (
                 <div className="bg-zinc-50 border border-zinc-200 rounded-xl p-4">
@@ -485,9 +500,18 @@ function ReviewStep({
 
             {/* Payment notice */}
             {isPaid && !paymentError && (
-                <div className="flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-xl p-4 text-sm text-blue-700">
-                    <IconCreditCard size={16} className="shrink-0 mt-0.5 text-blue-400" />
-                    <span>You&apos;ll be redirected to HDFC SmartGateway to complete payment of <strong>₹{totalPrice}</strong> via UPI. Your ticket is confirmed only after successful payment.</span>
+                <div className="rounded-xl border border-sky-200 bg-linear-to-br from-sky-50 to-blue-50 p-4 text-sm text-zinc-900">
+                    <div className="flex items-start">
+                        <div className="space-y-0.5">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-sky-800">Secure Payment</p>
+                            <p className="leading-snug">
+                                You&apos;ll be redirected to HDFC SmartGateway to complete payment of <strong>₹{totalPrice}</strong> via UPI.
+                            </p>
+                            <p className="text-xs text-slate-600">
+                                Ticket confirmation happens only after successful payment.
+                            </p>
+                        </div>
+                    </div>
                 </div>
             )}
 

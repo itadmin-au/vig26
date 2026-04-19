@@ -146,6 +146,7 @@ function buildUpdateSummary(original: any, updates: Record<string, unknown>): st
     if ("category" in updates && str(updates.category) !== str(original.category)) changed.push("category");
     if ("coverImage" in updates && str(updates.coverImage) !== str(original.coverImage)) changed.push("cover image");
     if ("registrationInstructions" in updates && str(updates.registrationInstructions) !== str(original.registrationInstructions)) changed.push("registration instructions");
+    if ("checkoutChargeDetails" in updates && str(updates.checkoutChargeDetails) !== str(original.checkoutChargeDetails)) changed.push("checkout charge details");
     if ("whatsappLink" in updates && str(updates.whatsappLink) !== str(original.whatsappLink)) changed.push("WhatsApp link");
     if ("externalRegistrationUrl" in updates && str(updates.externalRegistrationUrl) !== str(original.externalRegistrationUrl)) changed.push("external registration URL");
     if ("department" in updates && str(updates.department) !== str(original.department)) changed.push("department");
@@ -372,6 +373,7 @@ export async function createEvent(formData: FormData) {
     const whatsappLinkCreate = (raw.whatsappLink as string | undefined)?.trim() || undefined;
     const externalRegistrationUrlCreate = (raw.externalRegistrationUrl as string | undefined)?.trim() || undefined;
     const registrationInstructionsCreate = (raw.registrationInstructions as string | undefined)?.trim() || undefined;
+    const checkoutChargeDetailsCreate = (raw.checkoutChargeDetails as string | undefined)?.trim() || undefined;
 
     const event = await Event.create({
         ...rest,
@@ -384,6 +386,7 @@ export async function createEvent(formData: FormData) {
         whatsappLink: whatsappLinkCreate,
         externalRegistrationUrl: externalRegistrationUrlCreate,
         registrationInstructions: registrationInstructionsCreate,
+        checkoutChargeDetails: checkoutChargeDetailsCreate,
         slots: slots.map((s) => ({
             label: s.label || undefined,
             start: new Date(s.start),
@@ -546,6 +549,11 @@ export async function updateEvent(id: string, formData: FormData) {
     // Markdown instructions shown at the top of the registration form
     if ("registrationInstructions" in raw) {
         updates.registrationInstructions = (raw.registrationInstructions as string | undefined)?.trim() || null;
+    }
+
+    // Markdown message shown on the checkout/review step for paid events
+    if ("checkoutChargeDetails" in raw) {
+        updates.checkoutChargeDetails = (raw.checkoutChargeDetails as string | undefined)?.trim() || null;
     }
 
     // customForm must be set via doc.save() so Mongoose preserves existing subdocument _id values.

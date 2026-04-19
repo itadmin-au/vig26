@@ -184,6 +184,8 @@ export interface IEvent {
     externalRegistrationUrl?: string;
     /** Markdown shown at the top of the registration form — useful for multi-step instructions */
     registrationInstructions?: string;
+    /** Optional Markdown message on checkout explaining what the fee includes */
+    checkoutChargeDetails?: string;
     /** Optional time slots; when present, registrations must pick a slot */
     slots?: IEventSlot[];
     /** Sequential rounds (e.g. prelims, semi-finals, finals) — informational only */

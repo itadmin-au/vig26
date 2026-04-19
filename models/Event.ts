@@ -163,6 +163,10 @@ const EventSchema = new Schema<IEventDocument>(
       type: String,
       default: null,
     },
+    checkoutChargeDetails: {
+      type: String,
+      default: null,
+    },
     csvToken: {
       type: String,
       default: null,

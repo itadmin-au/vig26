@@ -252,7 +252,7 @@ export default function RegistrationsPage() {
                             <thead>
                                 <tr className="border-b border-zinc-100 bg-zinc-50/50">
                                     <th className="text-left px-5 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wide">Participant</th>
-                                    <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wide">Ticket ID</th>
+                                    <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wide">Tickets</th>
                                     <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wide">Event</th>
                                     <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wide">Type</th>
                                     <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wide">Status</th>
@@ -272,15 +272,28 @@ export default function RegistrationsPage() {
                                                 <p className="text-xs text-zinc-400 font-mono">{reg.userId.collegeId}</p>
                                             )}
                                         </td>
-                                        <td className="px-4 py-3.5 w-36">
+                                        <td className="px-4 py-3.5 w-56">
                                             {reg.tickets?.length > 0 ? (
-                                                <div className="flex flex-col gap-1">
+                                                <div className="flex flex-col gap-2">
                                                     {reg.tickets.map((t: any) => (
-                                                        <div key={t._id} className="flex items-center gap-0.5">
-                                                            <span title={t.qrCode} className="text-xs font-mono text-zinc-400 truncate max-w-30">
-                                                                {t.qrCode.slice(0, 8)}…
-                                                            </span>
-                                                            <CopyButton text={t.qrCode} />
+                                                        <div key={t._id} className="space-y-0.5">
+                                                            <div className="flex items-center gap-0.5">
+                                                                <span title={t.qrCode} className="text-xs font-mono text-zinc-400 truncate max-w-30">
+                                                                    {t.qrCode.slice(0, 8)}…
+                                                                </span>
+                                                                <CopyButton text={t.qrCode} />
+                                                                {t.teamRole && (
+                                                                    <span className="ml-1 text-[10px] px-1 py-0.5 rounded bg-zinc-100 text-zinc-400 capitalize shrink-0">{t.teamRole}</span>
+                                                                )}
+                                                            </div>
+                                                            {t.userId ? (
+                                                                <p className="text-[11px] text-zinc-500 leading-tight">
+                                                                    {t.userId.name ?? "—"}
+                                                                    {t.userId.email && <span className="text-zinc-300"> · {t.userId.email}</span>}
+                                                                </p>
+                                                            ) : (
+                                                                <p className="text-[11px] text-zinc-300 italic">No user linked</p>
+                                                            )}
                                                         </div>
                                                     ))}
                                                 </div>
@@ -300,10 +313,7 @@ export default function RegistrationsPage() {
                                         </td>
                                         <td className="px-4 py-3.5 text-xs text-zinc-500 whitespace-nowrap">
                                             {reg.isTeamRegistration ? (
-                                                <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-medium">
-                                                    Team
-                                                    {reg.teamId && <span className="text-blue-400 ml-1">#{reg.teamId}</span>}
-                                                </span>
+                                                <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-medium">Team</span>
                                             ) : (
                                                 <span className="bg-zinc-100 text-zinc-600 px-2 py-0.5 rounded-full font-medium">Individual</span>
                                             )}

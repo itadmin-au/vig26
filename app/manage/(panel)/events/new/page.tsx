@@ -332,6 +332,7 @@ export default function NewEventPage() {
     const [whatsappLink, setWhatsappLink] = useState("");
     const [externalRegistrationUrl, setExternalRegistrationUrl] = useState("");
     const [registrationInstructions, setRegistrationInstructions] = useState("");
+    const [checkoutChargeDetails, setCheckoutChargeDetails] = useState("");
     const [expandedSections, setExpandedSections] = useState({
         basic: true, details: true, rules: false, team: false, form: false, slots: false, rounds: false,
     });
@@ -465,6 +466,7 @@ export default function NewEventPage() {
         formData.set("whatsappLink", whatsappLink.trim());
         formData.set("externalRegistrationUrl", externalRegistrationUrl.trim());
         formData.set("registrationInstructions", registrationInstructions.trim());
+        formData.set("checkoutChargeDetails", checkoutChargeDetails.trim());
 
         // Pass the already-uploaded Cloudinary URL as a plain string
         if (coverImageUrl) {
@@ -735,6 +737,19 @@ export default function NewEventPage() {
                                             </label>
                                         </div>
                                     )}
+                                </div>
+                            </div>
+
+                            <div>
+                                <Label>Checkout Charge Details <span className="text-zinc-400 font-normal">(optional)</span></Label>
+                                <p className="text-xs text-zinc-400 mt-0.5 mb-1.5">Shown on the final checkout step for paid events to explain what the fee includes (supports Markdown).</p>
+                                <div data-color-mode="light">
+                                    <MDEditor
+                                        value={checkoutChargeDetails}
+                                        onChange={(val) => setCheckoutChargeDetails(val ?? "")}
+                                        height={160}
+                                        preview="edit"
+                                    />
                                 </div>
                             </div>
 

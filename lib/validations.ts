@@ -95,6 +95,7 @@ const eventBaseSchema = z.object({
     customForm: z.array(formFieldSchema).default([]),
     slots: z.array(eventSlotSchema).default([]),
     rounds: z.array(eventRoundSchema).default([]),
+    checkoutChargeDetails: z.string().trim().optional(),
     status: z.enum(["draft", "published"]).default("draft"),
 });
 

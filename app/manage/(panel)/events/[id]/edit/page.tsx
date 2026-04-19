@@ -292,6 +292,7 @@ export default function EditEventPage() {
     const [whatsappLink, setWhatsappLink] = useState("");
     const [externalRegistrationUrl, setExternalRegistrationUrl] = useState("");
     const [registrationInstructions, setRegistrationInstructions] = useState("");
+    const [checkoutChargeDetails, setCheckoutChargeDetails] = useState("");
     const [expanded, setExpanded] = useState({
         basic: true, details: true, rules: false, team: false, form: false, slots: false, rounds: false,
     });
@@ -323,6 +324,7 @@ export default function EditEventPage() {
                 setWhatsappLink((found as any).whatsappLink ?? "");
                 setExternalRegistrationUrl((found as any).externalRegistrationUrl ?? "");
                 setRegistrationInstructions((found as any).registrationInstructions ?? "");
+                setCheckoutChargeDetails((found as any).checkoutChargeDetails ?? "");
                 setRules(found.rules ?? "");
                 setSelectedDeptId(
                     typeof found.department === "string"
@@ -436,6 +438,7 @@ export default function EditEventPage() {
         formData.set("whatsappLink", whatsappLink.trim());
         formData.set("externalRegistrationUrl", externalRegistrationUrl.trim());
         formData.set("registrationInstructions", registrationInstructions.trim());
+        formData.set("checkoutChargeDetails", checkoutChargeDetails.trim());
 
         // Pass current Cloudinary URL (or empty string to signal removal)
         formData.set("coverImage", coverImageUrl ?? "");
@@ -698,6 +701,19 @@ export default function EditEventPage() {
                                             </label>
                                         </div>
                                     )}
+                                </div>
+                            </div>
+
+                            <div>
+                                <Label>Checkout Charge Details <span className="text-zinc-400 font-normal">(optional)</span></Label>
+                                <p className="text-xs text-zinc-400 mt-0.5 mb-1.5">Shown on the final checkout step for paid events to explain what the fee includes (supports Markdown).</p>
+                                <div data-color-mode="light">
+                                    <MDEditor
+                                        value={checkoutChargeDetails}
+                                        onChange={(val) => setCheckoutChargeDetails(val ?? "")}
+                                        height={160}
+                                        preview="edit"
+                                    />
                                 </div>
                             </div>
                         </div>

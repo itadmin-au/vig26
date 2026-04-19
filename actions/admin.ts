@@ -441,7 +441,8 @@ export async function getAllRegistrationsAdmin(options: {
 
     const regIds = registrations.map((r: any) => r._id);
     const tickets = await Ticket.find({ registrationId: { $in: regIds } })
-        .select("registrationId qrCode userId")
+        .select("registrationId qrCode userId teamRole")
+        .populate("userId", "name email collegeId")
         .lean();
 
     const ticketsByReg = new Map<string, any[]>();
