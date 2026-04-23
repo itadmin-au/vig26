@@ -564,3 +564,67 @@ export async function checkInTicketAdmin(ticketId: string) {
 
     return { success: true, data: serialize(updated) };
 }
+
+export async function getAllRegistrationsForEvent(eventId: string) {
+    await requireManagement();
+    await connectDB();
+
+    const mongoose = (await import("mongoose")).default;
+    const oid = new mongoose.Types.ObjectId(eventId);
+
+    const registrations = await Registration.find({ eventId: oid })
+        .populate("eventId", "title venue date _id")
+        .populate("userId", "name email collegeId")
+        .sort({ createdAt: 1 })
+        .lean();
+
+    const regIds = registrations.map((r: any) => r._id);
+    const tickets = await Ticket.find({ registrationId: { $in: regIds } })
+        .select("registrationId qrCode userId teamRole attendanceStatus checkedInAt")
+        .populate("userId", "name email collegeId")
+        .lean();
+
+    const ticketsByReg = new Map<string, any[]>();
+    for (const t of tickets) {
+        const key = (t.registrationId as any).toString();
+        if (!ticketsByReg.has(key)) ticketsByReg.set(key, []);
+        ticketsByReg.get(key)!.push(t);
+    }
+
+    const enriched = registrations.map((r: any) => ({
+        ...r,
+        tickets: ticketsByReg.get(r._id.toString()) ?? [],
+    }));
+
+    return { success: true, data: serialize(enriched) as any[] };
+}
+
+export async function getManagementEventsList() {
+    const session = await requireManagement();
+    await connectDB();
+
+    const filter: Record<string, any> = { status: { $ne: "draft" } };
+    if (session.user.role !== "super_admin") {
+        filter.department = { $in: session.user.departments };
+    }
+
+    const events = await Event.find(filter)
+        .select("_id title")
+        .sort({ title: 1 })
+        .lean();
+
+    return { success: true, data: serialize(events) as unknown as { _id: string; title: string }[] };
+}
+
+export async function getEventWithCustomForm(eventId: string) {
+    await requireManagement();
+    await connectDB();
+
+    const event = await Event.findById(eventId)
+        .select("_id title venue date customForm category department")
+        .populate("department", "name")
+        .lean();
+
+    if (!event) return { success: false, error: "Event not found." };
+    return { success: true, data: serialize(event) };
+}
