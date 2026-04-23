@@ -198,7 +198,7 @@ export async function POST(req: Request) {
                     await User.findByIdAndUpdate(session.user.id, { collegeId: leaderUsn.trim() }, { session: dbSession });
                 }
 
-                const [reg] = await Registration.create(
+                const createdRegs = await Registration.create(
                     [
                         {
                             eventId: parsed.data.eventId,
@@ -215,7 +215,7 @@ export async function POST(req: Request) {
                     ],
                     { session: dbSession }
                 );
-                registration = reg;
+                registration = createdRegs[0];
 
                 // Increment registrationCount inside the transaction so retries don't over-count
                 await Event.findByIdAndUpdate(

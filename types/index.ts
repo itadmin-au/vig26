@@ -209,6 +209,7 @@ export interface IRegistration {
     /** The slot chosen during registration (only when event has slots) */
     slotId?: string;
     paymentId?: string;
+    amountPaid?: number;
     addMemberOrderIds?: string[];
     paymentStatus: PaymentStatus;
     status: RegistrationStatus;

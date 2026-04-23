@@ -93,7 +93,6 @@ export default function EventDetailPage() {
     const end = new Date(event.date.end);
     const now = new Date();
     const isOver = now > end;
-    const hasStarted = now > start;
     const slotsLeft = event.capacity > 0 ? event.capacity - event.registrationCount : null;
     const isFull = slotsLeft !== null && slotsLeft <= 0;
     const isCancelled = event.status === "cancelled";
@@ -370,10 +369,6 @@ export default function EventDetailPage() {
                                 <button disabled className="w-full py-2.5 bg-zinc-100 text-zinc-400 text-sm font-semibold rounded-xl cursor-not-allowed">
                                     Event is Over
                                 </button>
-                            ) : hasStarted ? (
-                                <button disabled className="w-full py-2.5 bg-zinc-100 text-zinc-400 text-sm font-semibold rounded-xl cursor-not-allowed">
-                                    Registration Closed
-                                </button>
                             ) : isFull ? (
                                 <button disabled className="w-full py-2.5 bg-zinc-100 text-zinc-400 text-sm font-semibold rounded-xl cursor-not-allowed">
                                     Fully Booked
@@ -410,7 +405,7 @@ export default function EventDetailPage() {
                                 </Link>
                             )}
 
-                            {!session && !isCancelled && !isOver && !hasStarted && !isFull && !isRegistered && (
+                            {!session && !isCancelled && !isOver && !isFull && !isRegistered && (
                                 <p className="text-xs text-zinc-400 text-center">
                                     Already have an account?{" "}
                                     <Link href={`/auth/login?callbackUrl=/events/${slug}/register`} className="text-orange-500 hover:underline">
