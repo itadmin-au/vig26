@@ -297,6 +297,52 @@ export async function updateTeamMember(
     return { success: true };
 }
 
+export async function getEventRevenue(eventId: string) {
+    await requireManagement();
+    await connectDB();
+
+    const mongoose = (await import("mongoose")).default;
+    const oid = new mongoose.Types.ObjectId(eventId);
+
+    const event = await Event.findById(oid).select("price pricePerPerson").lean();
+    if (!event) return { success: false, error: "Event not found." };
+
+    const price = (event as any).price ?? 0;
+    const pricePerPerson = (event as any).pricePerPerson ?? false;
+
+    if (price === 0) {
+        return { success: true, data: { totalRevenue: 0, paidCount: 0, pendingCount: 0, expectedFromPending: 0, isFree: true } };
+    }
+
+    const revenueExpr = pricePerPerson
+        ? { $multiply: [price, { $add: [{ $size: { $ifNull: ["$teamMembers", []] } }, 1] }] }
+        : price;
+
+    const [collected, pending] = await Promise.all([
+        Registration.aggregate([
+            { $match: { eventId: oid, status: "confirmed", paymentStatus: "completed" } },
+            { $project: { revenue: revenueExpr } },
+            { $group: { _id: null, total: { $sum: "$revenue" }, count: { $sum: 1 } } },
+        ]),
+        Registration.aggregate([
+            { $match: { eventId: oid, paymentStatus: "pending" } },
+            { $project: { expected: revenueExpr } },
+            { $group: { _id: null, total: { $sum: "$expected" }, count: { $sum: 1 } } },
+        ]),
+    ]);
+
+    return {
+        success: true,
+        data: {
+            totalRevenue: collected[0]?.total ?? 0,
+            paidCount: collected[0]?.count ?? 0,
+            pendingCount: pending[0]?.count ?? 0,
+            expectedFromPending: pending[0]?.total ?? 0,
+            isFree: false,
+        },
+    };
+}
+
 export async function removeTeamMember(registrationId: string, memberIndex: number) {
     const session = await requireAuth();
     await connectDB();

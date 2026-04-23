@@ -221,12 +221,11 @@ function generateSheetHTML(opts: {
         return `<div class="page-section">
   <div class="hd">
     <div class="hd-top">
-      <img src="${baseUrl}/vigyaanrang.png" class="hd-logo" alt="" />
+      <img src="${baseUrl}/atria_bg.png" class="hd-logo hd-logo-atria" alt="" />
       <div class="hd-text">
-        <div class="hd-org">Vigyaanrang 2026</div>
-        ${departmentName ? `<div class="hd-dept">${esc(departmentName)}</div>` : ""}
-        ${category ? `<div class="hd-cat">${esc(category)}</div>` : ""}
+        <div class="hd-org">Atria Institute of Technology</div>
       </div>
+      <img src="${baseUrl}/vigyaanrang.png" class="hd-logo hd-logo-vigyaan" alt="" />
     </div>
     <div class="hd-rule"></div>
     <div class="hd-meta">
@@ -258,12 +257,13 @@ function generateSheetHTML(opts: {
   .page-section:last-child { page-break-after: avoid; }
 
   .hd { margin-bottom: 12px; }
-  .hd-top { display: flex; align-items: center; gap: 16px; padding-bottom: 8px; }
+  .hd-top { display: flex; align-items: center; gap: 12px; padding-bottom: 8px; }
   .hd-logo { height: 62px; width: auto; flex-shrink: 0; display: block; }
-  .hd-text { flex: 1; }
+  .hd-logo-atria { filter: invert(1); }
+  .hd-logo-vigyaan { filter: brightness(0); }
+  @media print { .hd-logo-atria { filter: invert(1); print-color-adjust: exact; -webkit-print-color-adjust: exact; } .hd-logo-vigyaan { filter: brightness(0); print-color-adjust: exact; -webkit-print-color-adjust: exact; } }
+  .hd-text { flex: 1; text-align: center; }
   .hd-org { font-size: 18pt; font-weight: 700; color: #111; line-height: 1.1; }
-  .hd-dept { font-size: 10.5pt; font-weight: 600; color: #333; margin-top: 3px; }
-  .hd-cat { font-size: 9pt; color: #666; margin-top: 2px; }
   .hd-rule { border: none; border-top: 2px solid #111; }
   .hd-meta { display: flex; align-items: center; justify-content: space-between; padding: 5px 0 8px; }
   .hd-fields { display: flex; gap: 24px; font-size: 9pt; color: #222; }

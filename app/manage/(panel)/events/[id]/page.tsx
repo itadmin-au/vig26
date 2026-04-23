@@ -7,7 +7,7 @@ import { useSession } from "next-auth/react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { getManageEvents, generateCsvToken, syncEventRegistrationCount, toggleRegistrations, publishEvent, cancelEvent, getEventAuditLog } from "@/actions/events";
-import { getEventRegistrations, toggleAttendance } from "@/actions/registrations";
+import { getEventRegistrations, toggleAttendance, getEventRevenue } from "@/actions/registrations";
 import { toast } from "sonner";
 import {
     IconEdit, IconArrowLeft, IconDownload,
@@ -128,6 +128,7 @@ export default function ManageEventDetailPage() {
     const [activeTab, setActiveTab] = useState<"overview" | "registrations" | "activity">("overview");
     const [regStatusFilter, setRegStatusFilter] = useState<"all" | "confirmed" | "pending" | "cancelled">("all");
     const [checkinFilter, setCheckinFilter] = useState<"all" | "checked_in" | "not_checked_in">("all");
+    const [revenue, setRevenue] = useState<{ totalRevenue: number; paidCount: number; pendingCount: number; expectedFromPending: number; isFree: boolean } | null>(null);
     const [auditLogs, setAuditLogs] = useState<any[]>([]);
     const [loadingLogs, setLoadingLogs] = useState(false);
     const [generatingToken, setGeneratingToken] = useState(false);
@@ -143,16 +144,17 @@ export default function ManageEventDetailPage() {
         async function load() {
             setLoading(true);
             try {
-                const [eventsData, regsResult, sheetsStatus] = await Promise.all([
+                const [eventsData, regsResult, sheetsStatus, revenueResult] = await Promise.all([
                     getManageEvents(),
                     getEventRegistrations(id),
                     fetch("/api/auth/google-sheets/status").then((r) => r.json()),
-                    syncEventRegistrationCount(id),
+                    syncEventRegistrationCount(id).then(() => getEventRevenue(id)),
                 ]);
                 const found = eventsData.find((e) => e._id.toString() === id) ?? null;
                 setEvent(found);
                 if (regsResult.success) setRegistrations(regsResult.data as IRegistration[]);
                 setSheetsConnected(sheetsStatus.connected ?? false);
+                if (revenueResult.success && revenueResult.data) setRevenue(revenueResult.data);
             } catch {
                 toast.error("Failed to load event.");
             } finally {
@@ -508,7 +510,7 @@ export default function ManageEventDetailPage() {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-5 pt-5 border-t border-zinc-100">
+                    <div className={`grid grid-cols-2 ${event.price > 0 ? "sm:grid-cols-5" : "sm:grid-cols-4"} gap-4 mt-5 pt-5 border-t border-zinc-100`}>
                         <div className="flex items-center gap-2">
                             <IconCalendarEvent size={16} className="text-zinc-400 shrink-0" />
                             <div>
@@ -548,6 +550,17 @@ export default function ManageEventDetailPage() {
                                 <p className="text-sm font-medium text-zinc-900">{event.price === 0 ? "Free" : `₹${event.price}`}</p>
                             </div>
                         </div>
+                        {event.price > 0 && (
+                            <div className="flex items-center gap-2">
+                                <IconCurrencyRupee size={16} className="text-green-500 shrink-0" />
+                                <div>
+                                    <p className="text-xs text-zinc-400">Revenue</p>
+                                    <p className="text-sm font-medium text-zinc-900">
+                                        {revenue ? `₹${revenue.totalRevenue.toLocaleString("en-IN")}` : "—"}
+                                    </p>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -577,6 +590,45 @@ export default function ManageEventDetailPage() {
             {/* Overview tab */}
             {activeTab === "overview" && (
                 <div className="space-y-4">
+                    {event.price > 0 && revenue && (
+                        <div className="bg-white rounded-xl border border-zinc-200 p-5">
+                            <h3 className="text-sm font-semibold text-zinc-900 mb-4 flex items-center gap-2">
+                                <IconCurrencyRupee size={15} className="text-green-600" />
+                                Revenue
+                            </h3>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                                <div className="bg-green-50 rounded-lg px-4 py-3">
+                                    <p className="text-xs text-green-700 font-medium">Total Collected</p>
+                                    <p className="text-2xl font-bold text-green-800 mt-0.5">
+                                        ₹{revenue.totalRevenue.toLocaleString("en-IN")}
+                                    </p>
+                                    <p className="text-xs text-green-600 mt-0.5">
+                                        from {revenue.paidCount} paid registration{revenue.paidCount !== 1 ? "s" : ""}
+                                    </p>
+                                </div>
+                                <div className="bg-zinc-50 rounded-lg px-4 py-3">
+                                    <p className="text-xs text-zinc-500 font-medium">Pending Payments</p>
+                                    <p className="text-2xl font-bold text-zinc-700 mt-0.5">
+                                        {revenue.pendingCount}
+                                    </p>
+                                    <p className="text-xs text-zinc-400 mt-0.5">
+                                        {revenue.pendingCount > 0
+                                            ? `≈ ₹${revenue.expectedFromPending.toLocaleString("en-IN")} expected`
+                                            : "no pending payments"}
+                                    </p>
+                                </div>
+                                <div className="bg-zinc-50 rounded-lg px-4 py-3">
+                                    <p className="text-xs text-zinc-500 font-medium">Price per Entry</p>
+                                    <p className="text-2xl font-bold text-zinc-700 mt-0.5">
+                                        ₹{event.price.toLocaleString("en-IN")}
+                                    </p>
+                                    <p className="text-xs text-zinc-400 mt-0.5">
+                                        {(event as any).pricePerPerson ? "per person" : "per registration"}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                     {event.description && (
                         <div className="bg-white rounded-xl border border-zinc-200 p-5">
                             <h3 className="text-sm font-semibold text-zinc-900 mb-2">Description</h3>
@@ -698,13 +750,14 @@ export default function ManageEventDetailPage() {
 
                         {registrations.length > 0 && (
                             <div className="flex items-center gap-2">
-                                <button
-                                    onClick={() => exportGoogleSheetStyleCSV(event, registrations as any[])}
+                                <a
+                                    href={`/api/events/${id}/export`}
+                                    download
                                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-700 border border-zinc-200 rounded-lg hover:bg-zinc-50 transition-colors"
                                 >
                                     <IconDownload size={13} />
-                                    Export CSV
-                                </button>
+                                    Export XLSX
+                                </a>
                             </div>
                         )}
                     </div>
