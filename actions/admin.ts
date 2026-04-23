@@ -621,7 +621,7 @@ export async function getEventWithCustomForm(eventId: string) {
     await connectDB();
 
     const event = await Event.findById(eventId)
-        .select("_id title venue date customForm category department")
+        .select("_id title venue date customForm category department isTeamEvent")
         .populate("department", "name")
         .lean();
 

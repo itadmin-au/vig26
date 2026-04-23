@@ -105,7 +105,7 @@ function getCellValue(reg: any, colId: string): string {
             return `${checked}/${tickets.length}`;
         }
         default: {
-            if (isMember) return "";
+            // Custom form fields are team-level (e.g. "Team Name") — same value for all rows
             const response = reg.formResponses?.find((r: any) => r.fieldId === colId);
             if (!response) return "";
             if (Array.isArray(response.value)) return response.value.join(", ");
@@ -319,6 +319,10 @@ function CopyButton({ text }: { text: string }) {
 
 // ─── DownloadSheetModal ───────────────────────────────────────────────────────
 
+const TEAM_DEFAULT_SELECTED = new Set([
+    "sno", "name", "email", "college_id", "team_id", "payment_status", "registered_at",
+]);
+
 function DownloadSheetModal({
     onClose,
     sheetData,
@@ -328,8 +332,9 @@ function DownloadSheetModal({
     onClose: () => void;
     sheetData: any[];
     customFormFields: IFormField[];
-    eventDetails: { title: string; venue?: string; date?: { start: Date; end: Date }; department?: { name: string }; category?: string };
+    eventDetails: { title: string; venue?: string; date?: { start: Date; end: Date }; department?: { name: string }; category?: string; isTeamEvent?: boolean };
 }) {
+    const isTeam = !!eventDetails?.isTeamEvent;
     const dataColumns = [
         ...STANDARD_COLUMNS,
         ...customFormFields.map((f) => ({ id: f._id, label: f.label })),
@@ -337,7 +342,7 @@ function DownloadSheetModal({
 
     const [columns, setColumns] = useState<SheetColumn[]>(
         () => dataColumns
-            .filter((c) => DEFAULT_SELECTED.has(c.id))
+            .filter((c) => (isTeam ? TEAM_DEFAULT_SELECTED : DEFAULT_SELECTED).has(c.id))
             .map((c) => ({ id: c.id, label: c.label, isBlank: false }))
     );
     const [blankLabel, setBlankLabel] = useState("");
@@ -431,6 +436,35 @@ function DownloadSheetModal({
                     {/* Left panel — available fields + blank column creator */}
                     <div className="w-52 shrink-0 border-r border-zinc-100 flex flex-col">
                         <p className="px-4 pt-4 pb-2 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Fields</p>
+                        {isTeam && (() => {
+                            const MEMBER_COLS = ["name", "email", "college_id"] as const;
+                            const missingMemberCols = MEMBER_COLS.filter(
+                                (id) => !columns.some((c) => c.id === id)
+                            );
+                            return (
+                                <div className="mx-3 mb-2 px-2.5 py-1.5 rounded-lg bg-blue-50 text-[10px] leading-snug space-y-1.5">
+                                    <p className="text-blue-600">
+                                        Team event — <b>Name</b>, <b>Email</b>, <b>College ID</b> auto-fill per member row.
+                                    </p>
+                                    {missingMemberCols.length > 0 && (
+                                        <button
+                                            onClick={() => {
+                                                const toAdd = STANDARD_COLUMNS.filter((c) =>
+                                                    missingMemberCols.includes(c.id as any)
+                                                );
+                                                setColumns((prev) => [
+                                                    ...prev,
+                                                    ...toAdd.map((c) => ({ ...c, isBlank: false })),
+                                                ]);
+                                            }}
+                                            className="w-full text-left font-semibold text-blue-700 hover:text-blue-900 underline underline-offset-2"
+                                        >
+                                            + Add missing member columns
+                                        </button>
+                                    )}
+                                </div>
+                            );
+                        })()}
                         <div className="flex-1 overflow-y-auto px-2 pb-2 space-y-0.5">
                             {availableStd.length > 0 && (
                                 <>
