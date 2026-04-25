@@ -2,6 +2,7 @@
 import { getAnalytics } from "@/actions/admin";
 import { requireSuperAdmin } from "@/lib/auth-helpers";
 import { redirect } from "next/navigation";
+import { DownloadReportButton } from "./DownloadReportButton";
 
 export default async function ManageAnalyticsPage() {
     try {
@@ -15,9 +16,12 @@ export default async function ManageAnalyticsPage() {
 
     return (
         <div className="space-y-5">
-            <div>
-                <h1 className="text-2xl font-bold text-zinc-900">Analytics</h1>
-                <p className="text-sm text-zinc-500 mt-0.5">Platform-wide stats and performance.</p>
+            <div className="flex items-start justify-between gap-4">
+                <div>
+                    <h1 className="text-2xl font-bold text-zinc-900">Analytics</h1>
+                    <p className="text-sm text-zinc-500 mt-0.5">Platform-wide stats and performance.</p>
+                </div>
+                <DownloadReportButton />
             </div>
 
             {!data ? (

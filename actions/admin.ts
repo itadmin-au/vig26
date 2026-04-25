@@ -433,16 +433,7 @@ export async function getAnalytics() {
 
     const revenueResult = await Registration.aggregate([
         { $match: { status: "confirmed", paymentStatus: "completed" } },
-        {
-            $lookup: {
-                from: "events",
-                localField: "eventId",
-                foreignField: "_id",
-                as: "event",
-            },
-        },
-        { $unwind: "$event" },
-        { $group: { _id: null, total: { $sum: "$event.price" } } },
+        { $group: { _id: null, total: { $sum: "$amountPaid" } } },
     ]);
 
     const totalRevenue = revenueResult[0]?.total ?? 0;

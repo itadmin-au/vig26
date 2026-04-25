@@ -75,7 +75,7 @@ export async function createHdfcOrder(params: {
 
 export async function getHdfcOrderStatus(
     orderId: string
-): Promise<{ order_id: string; status: string; amount: number }> {
+): Promise<{ order_id: string; status: string; amount: number; description?: string }> {
     const res = await fetch(`${BASE_URL}/orders/${orderId}`, {
         method: "GET",
         headers: {
@@ -93,6 +93,7 @@ export async function getHdfcOrderStatus(
         order_id: data.order_id ?? orderId,
         status: data.status ?? "",
         amount: parseFloat(data.amount ?? "0"),
+        description: data.description ?? data.order_description ?? undefined,
     };
 }
 
