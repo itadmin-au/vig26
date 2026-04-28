@@ -432,7 +432,7 @@ export async function getAnalytics() {
     ]);
 
     const revenueResult = await Registration.aggregate([
-        { $match: { status: "confirmed", paymentStatus: "completed" } },
+        { $match: { status: "confirmed", paymentStatus: "completed", paymentId: { $regex: /^vig_/ } } },
         { $group: { _id: null, total: { $sum: "$amountPaid" } } },
     ]);
 
